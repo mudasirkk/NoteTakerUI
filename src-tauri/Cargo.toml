@@ -26,8 +26,12 @@ tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 
 # Desktop Google sign-in: loopback OAuth + PKCE token exchange. native-tls keeps
-# us on Windows SChannel (no ring/rustls build toolchain needed).
+# us on Windows SChannel (no ring/rustls build toolchain needed). ureq's native-tls
+# backend is NOT auto-wired by the feature flag — the bare ureq::post helper has no
+# TLS connector and fails at runtime ("no TLS backend is configured"), so we build
+# the connector explicitly with the native-tls crate (see run_google_oauth).
 ureq = { version = "2", default-features = false, features = ["native-tls", "json"] }
+native-tls = "0.2"
 sha2 = "0.10"
 base64 = "0.22"
 getrandom = "0.2"

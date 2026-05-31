@@ -695,7 +695,15 @@ fn run_google_oauth(client_id: String, client_secret: String) -> Result<String, 
         return Err("state mismatch (possible CSRF)".into());
     }
 
-    let resp = ureq::post("https://oauth2.googleapis.com/token").send_form(&[
+    // ureq's native-tls backend must be attached to an Agent explicitly: the bare
+    // ureq::post helper builds a default agent with no TLS connector, which fails at
+    // runtime with "no TLS backend is configured". Wire the platform connector
+    // (SChannel on Windows, OpenSSL on Linux, Secure Transport on macOS) here.
+    let tls = native_tls::TlsConnector::new().map_err(|e| e.to_string())?;
+    let agent = ureq::AgentBuilder::new()
+        .tls_connector(std::sync::Arc::new(tls))
+        .build();
+    let resp = agent.post("https://oauth2.googleapis.com/token").send_form(&[
         ("client_id", client_id.as_str()),
         ("client_secret", client_secret.as_str()),
         ("code", code.as_str()),
