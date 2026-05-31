@@ -1,0 +1,625 @@
+/* NoteTakerUI — light theme (matches the approved plan.html mockups) */
+:root {
+  --paper: #fbf8f1;
+  --paper-2: #fdfbf6;
+  --paper-3: #f5efe2;
+  --line: #e4dac6;
+  --ink: #2a241c;
+  --ink-soft: #6a5f4f;
+  /* Darkened from #9a8f79 to clear WCAG AA 4.5:1 as body text on the darkest
+     surface it lands on (--paper-3); ~4.7:1 there (UI-2). */
+  --ink-faint: #726a55;
+  --accent: #d6451f;
+  --accent-deep: #b2360f;
+  --amber: #8a6410;
+  --teal: #1f5e5b;
+  --shadow: 0 26px 54px -22px rgba(33, 28, 22, 0.45), 0 4px 14px -8px rgba(33, 28, 22, 0.22);
+  /* Surface gradients & washes pulled into tokens so the dark theme (UI-5) can
+     flip them; in light mode these reproduce the original hand-picked values. */
+  --desk-grad: linear-gradient(160deg, #ece3d2 0%, #e1d7c1 100%);
+  --desk-dot: rgba(33, 28, 22, 0.045);
+  --bar-grad: linear-gradient(180deg, #f6f0e2, #efe7d6);
+  --head-grad: linear-gradient(180deg, #efe7d6, #e9dfca);
+  --resize-grad: linear-gradient(180deg, #e9dfca, #e3d8c0);
+  --hover: rgba(33, 28, 22, 0.09);
+  --field-focus: #fff;
+  /* The player is a video letterbox: it stays dark in both themes; only the
+     surrounding chrome flips. */
+  --player-bg: #1c1812;
+  --player-ink: #d9cfba;
+}
+
+/* Dark theme (UI-5). The token values live in one place but must be applied two
+   ways, so they're duplicated below: once for "system" preference (no data-theme,
+   honour the OS) and once for the explicit manual override. Keep the two blocks in
+   sync. Light is the default :root above; data-theme="light" simply wins over the
+   media query via higher specificity. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1c1814;
+    --paper-2: #221d17;
+    --paper-3: #2a241c;
+    --line: #3a3127;
+    --ink: #ece3d2;
+    --ink-soft: #c9bda6;
+    --ink-faint: #9a8f79;
+    --accent: #f0653c;
+    --accent-deep: #ff7d52;
+    --amber: #d8a93f;
+    --teal: #4cb5af;
+    --shadow: 0 26px 54px -22px rgba(0, 0, 0, 0.6), 0 4px 14px -8px rgba(0, 0, 0, 0.42);
+    --desk-grad: linear-gradient(160deg, #15110d 0%, #0f0c09 100%);
+    --desk-dot: rgba(255, 255, 255, 0.04);
+    --bar-grad: linear-gradient(180deg, #2a241c, #221d17);
+    --head-grad: linear-gradient(180deg, #251f19, #1f1a15);
+    --resize-grad: linear-gradient(180deg, #2a241c, #221d17);
+    --hover: rgba(255, 255, 255, 0.08);
+    --field-focus: #2f2820;
+    --player-bg: #15110c;
+    --player-ink: #d9cfba;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1c1814;
+  --paper-2: #221d17;
+  --paper-3: #2a241c;
+  --line: #3a3127;
+  --ink: #ece3d2;
+  --ink-soft: #c9bda6;
+  --ink-faint: #9a8f79;
+  --accent: #f0653c;
+  --accent-deep: #ff7d52;
+  --amber: #d8a93f;
+  --teal: #4cb5af;
+  --shadow: 0 26px 54px -22px rgba(0, 0, 0, 0.6), 0 4px 14px -8px rgba(0, 0, 0, 0.42);
+  --desk-grad: linear-gradient(160deg, #15110d 0%, #0f0c09 100%);
+  --desk-dot: rgba(255, 255, 255, 0.04);
+  --bar-grad: linear-gradient(180deg, #2a241c, #221d17);
+  --head-grad: linear-gradient(180deg, #251f19, #1f1a15);
+  --resize-grad: linear-gradient(180deg, #2a241c, #221d17);
+  --hover: rgba(255, 255, 255, 0.08);
+  --field-focus: #2f2820;
+  --player-bg: #15110c;
+  --player-ink: #d9cfba;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* The window itself is the scroll boundary: the whole app fits the viewport (the
+   note area scrolls internally), so maximizing never leaves content off-screen. */
+html, #root { height: 100%; }
+
+body {
+  font-family: "Newsreader", Georgia, serif;
+  color: var(--ink);
+  background: var(--desk-grad);
+  -webkit-font-smoothing: antialiased;
+  height: 100vh;
+  overflow: hidden;
+}
+
+::selection { background: var(--accent); color: #fff; }
+
+/* The "stage" is the padded desktop backdrop; the .app panel fills it (minus a
+   small inset frame) so the note area grows with the window. */
+.stage {
+  height: 100vh;             /* bound to the viewport so the app never overflows the screen */
+  overflow: hidden;
+  display: flex;
+  justify-content: flex-end; /* if .app ever has a max-width, keep it right-aligned */
+  align-items: stretch;
+  padding: 18px;
+  background-image: radial-gradient(circle at 1px 1px, var(--desk-dot) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
+.app {
+  flex: 1;        /* fill the stage width — no fixed cap, so resizing grows the notes */
+  min-width: 0;   /* let flex children (long text, map) shrink instead of overflowing */
+  display: flex;
+  flex-direction: column;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+/* ---------- top bar ---------- */
+.appbar { background: var(--bar-grad); border-bottom: 1px solid var(--line); }
+.bar-top { display: flex; align-items: center; gap: 10px; padding: 10px 12px 6px; }
+
+/* Windows-style window controls (minimize / maximize-restore / close), top-right. */
+.winctl { display: flex; align-items: center; gap: 2px; margin-left: 2px; }
+.winctl .wbtn {
+  width: 30px; height: 24px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: transparent; color: var(--ink-soft); padding: 0; cursor: pointer;
+  border-radius: 6px; transition: background 0.12s, color 0.12s;
+}
+.winctl .wbtn:hover { background: var(--hover); color: var(--ink); }
+.winctl .wbtn.close:hover { background: #e2542c; color: #fff; }
+
+.title-input {
+  flex: 1; min-width: 0;
+  font-family: "Fraunces", serif; font-weight: 600; font-size: 15px; color: var(--ink);
+  background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 3px 6px;
+}
+.title-input:hover { border-color: var(--line); }
+.title-input:focus { outline: none; border-color: var(--accent); background: var(--field-focus); }
+
+.timer {
+  font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--accent-deep);
+  background: rgba(214, 69, 31, 0.12); border: 1px solid rgba(214, 69, 31, 0.3);
+  border-radius: 6px; padding: 4px 9px; display: flex; gap: 6px; align-items: center; cursor: pointer;
+}
+.timer:hover { background: rgba(214, 69, 31, 0.18); }
+.timer .rec { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(214, 69, 31, 0.5); }
+  70% { box-shadow: 0 0 0 7px rgba(214, 69, 31, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(214, 69, 31, 0); }
+}
+
+.bar-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px 10px; }
+.vtoggle { display: flex; font-family: "JetBrains Mono", monospace; font-size: 11px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.vtoggle button { border: none; background: transparent; color: var(--ink-faint); padding: 4px 11px; cursor: pointer; font: inherit; }
+.vtoggle button.on { background: var(--accent); color: #fff; }
+
+.stamp-toggle {
+  display: flex; align-items: center; gap: 6px; font-family: "JetBrains Mono", monospace; font-size: 11px;
+  color: var(--ink-faint); background: transparent; border: 1px solid var(--line); border-radius: 7px;
+  padding: 4px 9px; cursor: pointer;
+}
+.stamp-toggle .led { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); }
+.stamp-toggle.on { color: var(--amber); border-color: rgba(176, 133, 36, 0.4); }
+.stamp-toggle.on .led { background: var(--amber); box-shadow: 0 0 6px rgba(176, 133, 36, 0.6); }
+
+/* ---------- outline ---------- */
+/* flex:1 + min-height:0 lets the note area grow and scroll inside the bounded
+   column, instead of pushing the player/status bar below the screen. */
+.body { flex: 1; min-height: 0; overflow-y: auto; }
+.outline { padding: 12px 10px; }
+
+.row { display: flex; align-items: flex-start; gap: 6px; border-radius: 7px; padding: 1px 6px 1px 0; }
+.row.sel { background: rgba(214, 69, 31, 0.08); box-shadow: inset 2px 0 0 var(--accent); }
+
+.fold {
+  flex: none; width: 16px; padding-top: 4px; background: none; border: none; cursor: pointer;
+  color: var(--ink-faint); font-size: 11px; line-height: 1;
+}
+.fold.leaf { cursor: default; }
+.bullet { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-faint); margin-top: 9px; }
+.bullet.has { box-shadow: 0 0 0 3px rgba(154, 143, 121, 0.25); }
+.row.sel .bullet { background: var(--accent); }
+
+.nodeinput {
+  flex: 1; min-width: 0; resize: none; overflow: hidden;
+  font-family: "Newsreader", serif; font-size: 15.5px; line-height: 1.5; color: var(--ink);
+  background: transparent; border: none; outline: none; padding: 3px 0;
+}
+.nodeinput::placeholder { color: var(--ink-faint); font-style: italic; }
+
+.ts {
+  flex: none; margin-top: 3px; font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+  color: var(--amber); background: rgba(176, 133, 36, 0.13); border: 1px solid rgba(176, 133, 36, 0.34);
+  border-radius: 5px; padding: 1px 6px; cursor: pointer;
+}
+.ts:hover { background: rgba(176, 133, 36, 0.22); }
+
+/* ---------- map placeholder ---------- */
+.map-placeholder { padding: 40px 26px; text-align: center; color: var(--ink-soft); }
+.map-badge { font-family: "Fraunces", serif; font-weight: 600; font-size: 20px; color: var(--ink); margin-bottom: 8px; }
+.map-placeholder kbd { font-family: "JetBrains Mono", monospace; font-size: 11px; background: var(--paper-3); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+
+/* ---------- map view (React Flow) ---------- */
+.mapwrap { position: relative; width: 100%; height: 100%; min-height: 340px; background: var(--paper); }
+/* Fullscreen map: cover the app chrome, but stay below the palettes (z-50) so
+   Ctrl+P/K/O still work over it. */
+.mapwrap.fs { position: fixed; inset: 0; z-index: 45; min-height: 0; border-radius: 0; }
+.react-flow__attribution { display: none; }
+.mapnode {
+  width: 188px; min-height: 48px; box-sizing: border-box;
+  background: var(--paper-2); border: 1px solid var(--line); border-left: 3px solid var(--ink-faint);
+  border-radius: 8px; padding: 6px 9px; font-family: "Newsreader", serif; color: var(--ink);
+  box-shadow: 0 2px 6px -3px rgba(33, 28, 22, 0.3); cursor: pointer; transition: box-shadow 0.12s, border-color 0.12s;
+}
+.mapnode:hover { box-shadow: 0 12px 26px -8px rgba(33, 28, 22, 0.5); }
+.mapnode.sel { border-color: var(--accent); border-left-color: var(--accent); background: var(--field-focus); box-shadow: 0 0 0 2px rgba(214, 69, 31, 0.25), 0 8px 20px -8px rgba(33, 28, 22, 0.4); }
+.mapnode.collapsed { border-style: dashed; }
+.mapnode-text {
+  font-size: 13px; line-height: 1.32; max-height: 2.64em; overflow: hidden; word-break: break-word;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.mapnode:hover .mapnode-text { display: block; max-height: none; -webkit-line-clamp: unset; }
+.mapnode-text:empty::before { content: "Untitled"; color: var(--ink-faint); font-style: italic; }
+.mapnode-foot { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.mapnode-ts { font-family: "JetBrains Mono", monospace; font-size: 9.5px; color: var(--amber); background: rgba(176, 133, 36, 0.13); border: 1px solid rgba(176, 133, 36, 0.3); border-radius: 4px; padding: 0 4px; }
+.mapnode-ts.seekable { color: var(--accent-deep); background: rgba(214, 69, 31, 0.1); border-color: rgba(214, 69, 31, 0.3); }
+.mapnode-more { font-family: "JetBrains Mono", monospace; font-size: 9px; color: var(--ink-faint); }
+/* Connection handles stay invisible until you hover a node (or start dragging a
+   link), then surface as small accent dots you can pull to draw a cross-link
+   between notes (UX-6). They remain functional while hidden. */
+.react-flow__handle {
+  width: 9px; height: 9px; min-width: 0; min-height: 0; border-radius: 50%;
+  background: var(--accent); border: 1.5px solid var(--paper);
+  opacity: 0; transition: opacity 0.12s ease, transform 0.1s ease;
+}
+.react-flow__node:hover .react-flow__handle,
+.react-flow__handle.connectionindicator,
+.react-flow__handle:hover { opacity: 1; }
+.react-flow__handle:hover { transform: scale(1.3); }
+.react-flow__edge-path { stroke: var(--ink-faint); stroke-width: 1.4; opacity: 0.55; }
+/* Hover-revealed remove control pinned at a cross-link's midpoint (UX-6). The
+   ✕ fades in only while the link (or the button) is hovered. */
+.link-del {
+  position: absolute; pointer-events: all;
+  width: 18px; height: 18px; border-radius: 50%;
+  display: grid; place-items: center; padding: 0;
+  font-size: 10px; line-height: 1; color: #fff;
+  background: #7c5cff; border: 1.5px solid var(--paper);
+  box-shadow: 0 2px 6px -2px rgba(33, 28, 22, 0.55);
+  cursor: pointer; opacity: 0; transition: opacity 0.12s ease;
+}
+.link-del.on { opacity: 1; }
+.link-del:hover { background: #6a48f0; }
+/* One-line linking hint, shown over the canvas until the first cross-link (UX-6). */
+.maphint {
+  position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 7px; max-width: calc(100% - 32px);
+  font-family: "Newsreader", serif; font-size: 12px; color: var(--ink-soft);
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 12px; box-shadow: var(--shadow); pointer-events: none; z-index: 6;
+}
+.maphint-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+.react-flow__controls { box-shadow: var(--shadow); border-radius: 8px; overflow: hidden; }
+.react-flow__controls-button { background: var(--paper-2); border-bottom: 1px solid var(--line); color: var(--ink-soft); }
+.react-flow__controls-button:hover { background: var(--paper-3); }
+
+/* ---------- player panel ---------- */
+/* flex:none keeps the player at its natural height within the bounded column. */
+.player { border-top: 1px solid var(--line); background: var(--player-bg); flex: none; }
+/* Drag handle between the notes and the video — lets the user trade vertical
+   space between the note area and the player. */
+.player-resize {
+  height: 9px; flex: none; cursor: row-resize; touch-action: none;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--resize-grad); border-bottom: 1px solid var(--line);
+}
+.player-resize::before { content: ""; width: 38px; height: 3px; border-radius: 2px; background: var(--ink-faint); opacity: 0.5; }
+.player-resize:hover::before { opacity: 0.9; background: var(--accent); }
+.player-head { display: flex; align-items: center; gap: 8px; padding: 5px 10px; background: var(--head-grad); border-bottom: 1px solid var(--line); }
+.player-fold { border: none; background: none; cursor: pointer; color: var(--ink-soft); font-size: 11px; padding: 0 2px; }
+.player-label { flex: 1; min-width: 0; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-replace { border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-soft); font-family: "JetBrains Mono", monospace; font-size: 10px; border-radius: 5px; padding: 2px 7px; cursor: pointer; }
+.player-replace:hover { border-color: var(--accent); color: var(--accent-deep); }
+/* Height comes from PlayerPanel as an inline style (the divider sets it); the
+   video fills that box and letterboxes, so it never overflows the column. */
+.player-body { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.yt-host { width: 100%; height: 100%; }
+.yt-host iframe { width: 100%; height: 100%; border: 0; display: block; }
+.lv-video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+.player-pick { margin: 26px auto; padding: 8px 16px; border: 1px dashed var(--ink-faint); background: transparent; color: var(--player-ink); border-radius: 8px; cursor: pointer; font-family: "JetBrains Mono", monospace; font-size: 12px; }
+.player-pick:hover { border-color: var(--accent); color: #fff; }
+.player-warn { padding: 22px 16px; color: var(--player-ink); font-size: 12.5px; text-align: center; }
+
+/* YouTube download fallback strip (DC-3): sits under the player on the desktop
+   build, surfacing the local-copy note, download progress, errors, and the opt-in
+   download button. */
+.player-ytbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 5px 10px; background: var(--head-grad); border-top: 1px solid var(--line);
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+}
+.player-ytnote { display: inline-flex; align-items: center; gap: 7px; color: var(--ink-soft); }
+.player-ytnote.error { color: var(--accent-deep); flex-wrap: wrap; }
+.player-ytbtn {
+  border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-soft);
+  font-family: "JetBrains Mono", monospace; font-size: 10px; border-radius: 5px;
+  padding: 2px 9px; cursor: pointer;
+}
+.player-ytbtn:hover { border-color: var(--accent); color: var(--accent-deep); }
+.ytspin {
+  display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+  border: 2px solid var(--line); border-top-color: var(--accent);
+  animation: authspin 0.7s linear infinite;
+}
+
+/* ---------- status bar ---------- */
+.statusbar { display: flex; align-items: center; gap: 10px; padding: 5px 12px; border-top: 1px solid var(--line); background: var(--paper-3); font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--ink-faint); }
+.src-wrap { position: relative; }
+.src { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--paper-2); border-radius: 6px; padding: 3px 8px; cursor: pointer; font: inherit; color: var(--ink-soft); }
+.src:hover { border-color: var(--accent); }
+.src-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); }
+.src-dot.youtube { background: var(--accent); }
+.src-dot.localVideo { background: var(--teal); }
+.src-dot.external { background: var(--ink-faint); }
+.src-name { max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.src-caret { color: var(--ink-faint); }
+.src-pop { position: absolute; bottom: calc(100% + 6px); left: 0; width: 240px; background: var(--paper-2); border: 1px solid var(--accent); border-radius: 10px; box-shadow: 0 18px 40px -14px rgba(33,28,22,0.5); padding: 6px; display: flex; flex-direction: column; gap: 4px; z-index: 40; }
+.src-opt { text-align: left; border: none; background: transparent; color: var(--ink-soft); font: inherit; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.src-opt:hover { background: rgba(214, 69, 31, 0.1); color: var(--ink); }
+.src-yt { display: flex; gap: 4px; padding: 2px; }
+.src-yt input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; font: inherit; background: var(--field-focus); color: var(--ink); outline: none; }
+.src-yt input:focus { border-color: var(--accent); }
+.src-yt button { border: none; background: var(--accent); color: #fff; border-radius: 6px; padding: 0 10px; cursor: pointer; font: inherit; }
+.seekflag { margin-left: auto; color: var(--ink-faint); }
+.seekflag.on { color: var(--teal); }
+.savestate { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-faint); }
+.save-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.savestate.saved { color: var(--ink-faint); }
+.savestate.synced { color: var(--teal); }
+.savestate.saving { color: var(--amber); }
+.savestate.saving .save-dot { animation: pulse 1.2s infinite; }
+.savestate.offline { color: var(--accent); }
+.view-loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--ink-faint); font-family: "JetBrains Mono", monospace; font-size: 12px; }
+
+/* ---------- hints ---------- */
+.hints {
+  display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--line);
+  background: var(--paper-3); font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--ink-faint);
+}
+.hints b { color: var(--accent-deep); font-weight: 700; }
+
+/* ---------- jump palette ---------- */
+.palscrim { position: fixed; inset: 0; background: rgba(33, 28, 22, 0.28); backdrop-filter: blur(2px); display: flex; justify-content: center; align-items: flex-start; z-index: 50; }
+.pal { margin-top: 12vh; width: 360px; max-width: 90vw; background: var(--paper-2); border: 1px solid var(--accent); border-radius: 12px; box-shadow: 0 26px 56px -12px rgba(33, 28, 22, 0.5); overflow: hidden; }
+.palin { display: flex; align-items: center; gap: 9px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.palin .arr { color: var(--accent); font-family: "JetBrains Mono", monospace; font-weight: 700; }
+.palin input { flex: 1; border: none; outline: none; background: transparent; font-family: "Newsreader", serif; font-size: 16px; color: var(--ink); }
+.pallist { max-height: 320px; overflow-y: auto; }
+.palrow { display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer; color: var(--ink-soft); }
+.palrow.on { background: rgba(214, 69, 31, 0.1); color: var(--ink); }
+.palrow .ic { font-family: "JetBrains Mono", monospace; color: var(--accent); font-size: 12px; width: 14px; flex: none; }
+.palrow .paltxt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; }
+.palrow .pts { margin-left: auto; font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--amber); flex: none; }
+.palempty { padding: 16px 14px; color: var(--ink-faint); font-style: italic; }
+.palfoot { display: flex; gap: 14px; padding: 9px 14px; border-top: 1px solid var(--line); font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--ink-faint); }
+
+/* ---------- command palette extras ---------- */
+.pal.cmd { border-color: var(--ink-soft); }
+.cmdhint { margin-left: auto; font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--ink-faint); background: var(--paper-3); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; flex: none; }
+
+/* ---------- maps switcher ---------- */
+.maps-btn { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--ink-faint); background: transparent; border: 1px solid var(--line); border-radius: 7px; padding: 4px 9px; cursor: pointer; }
+.maps-btn:hover { color: var(--accent); border-color: rgba(214, 69, 31, 0.4); }
+.pal-new { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--accent); background: transparent; border: 1px solid rgba(214, 69, 31, 0.4); border-radius: 6px; padding: 3px 8px; cursor: pointer; flex: none; }
+.pal-new:hover { background: rgba(214, 69, 31, 0.1); }
+.palrow.current .paltxt { color: var(--accent-deep); font-weight: 600; }
+.palrow .pal-del { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--ink-faint); background: transparent; border: none; cursor: pointer; padding: 2px 4px; margin-left: 4px; flex: none; opacity: 0; }
+.palrow:hover .pal-del, .palrow.on .pal-del { opacity: 1; }
+.palrow .pal-del:hover { color: var(--accent); }
+
+/* ---------- account (Firebase sign-in) ---------- */
+.acct { position: relative; flex: none; }
+.acct-btn { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--ink-faint); background: transparent; border: 1px solid var(--line); border-radius: 7px; padding: 4px 9px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.acct-btn:hover { color: var(--accent); border-color: rgba(214, 69, 31, 0.4); }
+.acct-btn:disabled { opacity: 0.6; cursor: default; }
+.acct-btn.on { padding: 2px; border-radius: 50%; }
+.acct-av { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; object-fit: cover; }
+.acct-av.init { background: var(--accent); color: #fff; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; }
+.acct-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; min-width: 180px; background: var(--paper-2); border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); padding: 8px; }
+.acct-who { padding: 4px 6px 8px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.acct-name { font-size: 12px; color: var(--ink); font-weight: 600; }
+.acct-email { font-size: 11px; color: var(--ink-faint); word-break: break-all; }
+.acct-signout { width: 100%; text-align: left; font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--ink-soft); background: transparent; border: none; border-radius: 6px; padding: 6px; cursor: pointer; }
+.acct-signout:hover { background: rgba(214, 69, 31, 0.1); color: var(--accent-deep); }
+.acct-err {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; width: 290px;
+  background: var(--paper-2); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 10px;
+  font-family: "JetBrains Mono", monospace; font-size: 11px; line-height: 1.45; color: var(--accent-deep);
+  box-shadow: 0 12px 32px rgba(33, 28, 22, 0.22);
+}
+.acct-err-x { float: right; border: none; background: none; cursor: pointer; color: var(--ink-faint); font-size: 14px; line-height: 1; margin: -2px -2px 0 6px; }
+.acct-err-x:hover { color: var(--accent); }
+
+/* ---------- tags ---------- */
+.tags { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-start; margin-top: 4px; flex: none; max-width: 42%; }
+.tag { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--teal); background: rgba(31, 94, 91, 0.1); border: 1px solid rgba(31, 94, 91, 0.3); border-radius: 5px; padding: 1px 6px; cursor: pointer; }
+.tag:hover { background: rgba(214, 69, 31, 0.12); color: var(--accent-deep); border-color: rgba(214, 69, 31, 0.3); }
+
+/* ---------- breadcrumb (zoom-into-node) ---------- */
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 2px 6px 8px; margin-bottom: 4px; border-bottom: 1px dashed var(--line); }
+.crumb-wrap { display: inline-flex; align-items: center; gap: 2px; }
+.crumb { border: none; background: none; cursor: pointer; font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--ink-faint); padding: 2px 5px; border-radius: 5px; max-width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crumb:hover { background: rgba(214, 69, 31, 0.1); color: var(--accent-deep); }
+.crumb.cur { color: var(--ink); font-weight: 600; cursor: default; }
+.crumb-sep { color: var(--ink-faint); font-size: 11px; }
+.zoom-empty { padding: 16px 12px; color: var(--ink-faint); font-style: italic; font-size: 13px; }
+.zoom-empty button { border: 1px solid var(--line); background: var(--paper-2); border-radius: 5px; padding: 2px 8px; cursor: pointer; color: var(--ink-soft); font-style: normal; }
+
+/* scrollbars */
+.body::-webkit-scrollbar, .pallist::-webkit-scrollbar { width: 10px; }
+.body::-webkit-scrollbar-thumb, .pallist::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; border: 3px solid var(--paper-2); }
+
+/* ---------- transcript ---------- */
+.cc-btn { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--ink-faint); background: transparent; border: 1px solid var(--line); border-radius: 5px; padding: 1px 7px; cursor: pointer; letter-spacing: 0.04em; }
+.cc-btn:hover { border-color: var(--accent); color: var(--accent-deep); }
+.cc-btn.has { color: var(--teal); border-color: rgba(31, 94, 91, 0.4); }
+.cc-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.tx-drawer {
+  position: fixed; right: 16px; bottom: 16px; z-index: 46;
+  width: min(420px, calc(100vw - 32px)); height: min(58vh, 580px);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+}
+.tx-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--line); background: var(--head-grad); }
+.tx-title { font-family: "Fraunces", serif; font-weight: 600; font-size: 15px; color: var(--ink); }
+.tx-count { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--ink-faint); }
+.tx-follow { margin-left: auto; font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--ink-faint); background: transparent; border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px; cursor: pointer; }
+.tx-follow.on { color: var(--teal); border-color: rgba(31, 94, 91, 0.4); }
+.tx-x { border: none; background: none; cursor: pointer; color: var(--ink-faint); font-size: 18px; line-height: 1; padding: 0 2px; }
+.tx-x:hover { color: var(--accent); }
+
+.tx-tools { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.tx-filter { flex: 1; min-width: 0; font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+.tx-filter:focus { outline: none; border-color: var(--accent); }
+.tx-tool { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--ink-soft); background: var(--paper); border: 1px solid var(--line); border-radius: 5px; padding: 3px 8px; cursor: pointer; }
+.tx-tool:hover { border-color: var(--accent); color: var(--accent-deep); }
+
+.tx-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px; }
+.tx-cue { display: flex; align-items: flex-start; gap: 8px; padding: 5px 7px; border-radius: 7px; }
+.tx-cue:hover { background: var(--paper-3); }
+.tx-cue.on { background: rgba(214, 69, 31, 0.1); }
+.tx-cue.on .tx-text { color: var(--ink); }
+.tx-time { flex: none; font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--ink-faint); background: none; border: none; padding: 2px 0; cursor: default; }
+.tx-time.seekable { color: var(--accent-deep); cursor: pointer; }
+.tx-time.seekable:hover { text-decoration: underline; }
+.tx-text { flex: 1; font-size: 13.5px; line-height: 1.4; color: var(--ink-soft); }
+.tx-add { flex: none; opacity: 0; border: 1px solid var(--line); background: var(--paper); color: var(--ink-soft); border-radius: 5px; width: 20px; height: 20px; line-height: 1; cursor: pointer; font-size: 13px; }
+.tx-cue:hover .tx-add { opacity: 1; }
+.tx-add:hover { border-color: var(--accent); color: var(--accent-deep); }
+
+.tx-empty { padding: 24px 18px; text-align: center; color: var(--ink-faint); font-size: 13px; }
+.tx-import { margin-top: 12px; font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--ink-soft); background: var(--paper); border: 1px dashed var(--ink-faint); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.tx-import:hover { border-color: var(--accent); color: var(--accent-deep); }
+.tx-err { color: var(--accent-deep); font-size: 11px; padding: 6px 10px; text-align: center; }
+.tx-none { padding: 16px; text-align: center; color: var(--ink-faint); font-size: 12px; font-style: italic; }
+.tx-list::-webkit-scrollbar { width: 10px; }
+.tx-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; border: 3px solid var(--paper-2); }
+
+/* ---------- pin toggle (UX-5) ---------- */
+.pinflag {
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--ink-faint);
+  background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; cursor: pointer;
+}
+.pinflag:hover { border-color: var(--accent); color: var(--accent-deep); }
+.pinflag.on { color: var(--accent-deep); border-color: rgba(214, 69, 31, 0.4); background: rgba(214, 69, 31, 0.08); }
+
+/* ---------- theme toggle (UI-5) ---------- */
+.theme-btn {
+  display: inline-flex; align-items: center; gap: 6px; font-family: "JetBrains Mono", monospace; font-size: 11px;
+  color: var(--ink-faint); background: transparent; border: 1px solid var(--line); border-radius: 7px;
+  padding: 4px 9px; cursor: pointer; text-transform: capitalize;
+}
+.theme-btn:hover { color: var(--accent); border-color: rgba(214, 69, 31, 0.4); }
+.theme-ic { font-size: 12px; line-height: 1; }
+
+/* ---------- footer "?" button (UI-3) ---------- */
+.hint-help {
+  margin-left: auto; font: inherit; color: var(--ink-faint); background: transparent;
+  border: 1px solid transparent; border-radius: 6px; padding: 1px 6px; cursor: pointer;
+}
+.hint-help:hover { border-color: var(--line); color: var(--ink-soft); }
+
+/* ---------- shortcuts overlay (UI-3) ---------- */
+.help {
+  margin-top: 9vh; width: 660px; max-width: 92vw; max-height: 80vh; display: flex; flex-direction: column;
+  background: var(--paper-2); border: 1px solid var(--accent); border-radius: 14px;
+  box-shadow: 0 26px 56px -12px rgba(33, 28, 22, 0.5); overflow: hidden;
+}
+.help-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--head-grad); }
+.help-head h2 { font-family: "Fraunces", serif; font-weight: 600; font-size: 17px; color: var(--ink); }
+.help-x { border: none; background: none; cursor: pointer; color: var(--ink-faint); font-size: 16px; line-height: 1; padding: 4px 6px; border-radius: 6px; }
+.help-x:hover { color: var(--accent); background: var(--hover); }
+.help-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 6px 22px; padding: 14px 18px; overflow-y: auto; }
+.help-col { break-inside: avoid; padding: 4px 0 8px; }
+.help-col h3 { font-family: "JetBrains Mono", monospace; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-deep); margin-bottom: 4px; }
+.help-note { color: var(--ink-faint); text-transform: none; letter-spacing: 0; font-weight: 400; }
+.help-row { display: flex; align-items: baseline; gap: 10px; padding: 3px 0; }
+.help-keys { flex: none; min-width: 116px; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.help kbd {
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--ink); background: var(--paper-3);
+  border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; white-space: nowrap;
+}
+.help-or { color: var(--ink-faint); font-size: 10px; }
+.help-act { flex: 1; font-size: 13.5px; color: var(--ink-soft); line-height: 1.35; }
+.help-foot { padding: 10px 16px; border-top: 1px solid var(--line); font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--ink-faint); }
+.help-foot kbd {
+  font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--ink-soft); background: var(--paper-3);
+  border: 1px solid var(--line); border-radius: 4px; padding: 0 4px;
+}
+.help-grid::-webkit-scrollbar { width: 10px; }
+.help-grid::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; border: 3px solid var(--paper-2); }
+
+/* ---------- onboarding coachmark (UX-8) ---------- */
+/* Non-modal, corner-anchored card shown once per install; it floats over the app
+   without a scrim so the user can start capturing notes immediately. */
+.onboard {
+  position: fixed; right: 18px; bottom: 56px; z-index: 40;
+  width: 320px; max-width: calc(100vw - 36px);
+  background: var(--paper-2); border: 1px solid var(--accent); border-radius: 14px;
+  box-shadow: 0 22px 50px -16px rgba(33, 28, 22, 0.55); overflow: hidden;
+  animation: onboard-in 0.18s ease;
+}
+@keyframes onboard-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.onboard-head { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px 8px; }
+.onboard-eyebrow { font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-deep); }
+.onboard-x { border: none; background: none; cursor: pointer; color: var(--ink-faint); font-size: 14px; line-height: 1; padding: 3px 5px; border-radius: 6px; }
+.onboard-x:hover { color: var(--accent); background: var(--hover); }
+.onboard-steps { list-style: none; margin: 0; padding: 2px 14px 4px; display: flex; flex-direction: column; gap: 9px; }
+.onboard-steps li { display: flex; gap: 9px; align-items: flex-start; }
+.onboard-num {
+  flex: none; width: 19px; height: 19px; border-radius: 50%; margin-top: 1px;
+  display: grid; place-items: center; font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+  color: #fff; background: var(--accent);
+}
+.onboard-step-txt { font-family: "Newsreader", serif; font-size: 12.5px; line-height: 1.4; color: var(--ink-soft); }
+.onboard-step-txt b { color: var(--ink); font-weight: 600; }
+.onboard-go {
+  display: block; width: calc(100% - 28px); margin: 6px 14px 14px; padding: 7px 0;
+  font: inherit; font-size: 12.5px; color: #fff; background: var(--accent);
+  border: none; border-radius: 8px; cursor: pointer;
+}
+.onboard-go:hover { background: var(--accent-deep); }
+
+/* ---------- login gate (DC-1) ---------- */
+.authgate { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--desk-grad); }
+/* Standalone draggable titlebar for the pre-auth screens (TopBar isn't mounted
+   behind the gate), reusing the shared .winctl / .wbtn window-control styles. */
+.gatebar { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 6px 0 14px; }
+.gatebar-brand { font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: 0.06em; color: var(--ink-faint); }
+.authgate-body { flex: 1; display: grid; place-items: center; padding: 24px; }
+.authgate-card {
+  width: 360px; max-width: 100%; box-sizing: border-box; text-align: center;
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: var(--shadow); padding: 34px 30px 30px;
+}
+.authgate-brand { font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-deep); margin-bottom: 16px; }
+.authgate-title { font-family: "Fraunces", serif; font-weight: 600; font-size: 23px; color: var(--ink); margin-bottom: 8px; }
+.authgate-sub { font-family: "Newsreader", serif; font-size: 14px; line-height: 1.45; color: var(--ink-soft); margin-bottom: 22px; }
+.authgate-google {
+  width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  font-family: "Newsreader", serif; font-size: 15px; color: #3c4043; background: #fff;
+  border: 1px solid #dadce0; border-radius: 9px; padding: 11px 0; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(33, 28, 22, 0.18); transition: box-shadow 0.12s, background 0.12s;
+}
+.authgate-google:hover { background: #f7f8fa; box-shadow: 0 2px 6px -1px rgba(33, 28, 22, 0.28); }
+.authgate-google:disabled { opacity: 0.7; cursor: default; }
+.authgate-err {
+  margin-top: 16px; text-align: left; font-size: 12.5px; line-height: 1.4; color: var(--ink);
+  background: rgba(214, 69, 31, 0.1); border: 1px solid rgba(214, 69, 31, 0.4); border-radius: 9px; padding: 10px 12px;
+}
+.authgate-err p { margin-bottom: 8px; }
+.authgate-retry {
+  font: inherit; font-size: 12px; color: #fff; background: var(--accent);
+  border: none; border-radius: 7px; padding: 5px 12px; cursor: pointer;
+}
+.authgate-retry:hover { background: var(--accent-deep); }
+.authgate-retry:disabled { opacity: 0.6; cursor: default; }
+.authgate-offline {
+  display: block; margin: 16px auto 0; font: inherit; font-size: 12.5px; color: var(--ink-faint);
+  background: none; border: none; cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.authgate-offline:hover { color: var(--accent); }
+.authspin { display: inline-block; width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: authspin 0.7s linear infinite; }
+.authgate-resolving { font-family: "Newsreader", serif; font-size: 14px; color: var(--ink-soft); margin-top: 14px; }
+@keyframes authspin { to { transform: rotate(360deg); } }
+
+/* ---------- sync notice toast (DC-2a) ---------- */
+.syncnotice {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 56px; z-index: 45;
+  display: flex; align-items: center; gap: 10px;
+  max-width: min(440px, calc(100vw - 36px));
+  background: var(--paper-2); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  border-radius: 11px; box-shadow: 0 18px 44px -16px rgba(33, 28, 22, 0.5);
+  padding: 10px 12px 10px 13px; animation: syncnotice-in 0.18s ease;
+}
+@keyframes syncnotice-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.syncnotice-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.syncnotice-text { font-family: "Newsreader", serif; font-size: 13px; line-height: 1.4; color: var(--ink); }
+.syncnotice-x {
+  flex: none; border: none; background: none; cursor: pointer; color: var(--ink-faint);
+  font-size: 13px; line-height: 1; padding: 3px 5px; border-radius: 6px;
+}
+.syncnotice-x:hover { color: var(--accent); background: var(--hover); }

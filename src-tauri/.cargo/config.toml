@@ -1,0 +1,13 @@
+# Local build config for this machine (GNU toolchain, no MSVC / no admin).
+#
+# The rustup self-contained MinGW bundle ships dlltool.exe but NOT the GNU
+# assembler (as.exe) it needs, so raw-dylib crates (getrandom, windows-sys,
+# parking_lot_core, ...) fail with "dlltool could not create import library".
+#
+# Fix: use llvm-dlltool (created by copying llvm-ar.exe -> llvm-dlltool.exe in
+# the toolchain bin dir; LLVM's ar/dlltool are one multicall binary). It needs
+# no separate assembler. rustc detects the "llvm" name and emits LLVM-style flags.
+[target.x86_64-pc-windows-gnu]
+rustflags = [
+  "-Cdlltool=C:\\Users\\mudas\\.rustup\\toolchains\\stable-x86_64-pc-windows-gnu\\lib\\rustlib\\x86_64-pc-windows-gnu\\bin\\llvm-dlltool.exe",
+]
