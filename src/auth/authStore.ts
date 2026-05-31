@@ -34,17 +34,17 @@ interface AuthState {
   // neutral splash while `ready` is false instead of flashing the login screen.
   ready: boolean;
   user: AuthUser | null;
-  // This device has completed a sign-in at least once. Drives the offline
-  // fallback (DC-1a): a previously-signed-in user who can't reach the network may
-  // keep working on their local notes rather than being locked out at the gate.
+  // This device has completed a sign-in at least once. Kept for messaging (e.g.
+  // distinguishing a returning user); no longer gates the local-only option.
   hadSession: boolean;
-  // The user chose "continue offline" after a prior session while signed out.
+  // The user chose to use the app WITHOUT an account (local-only storage). Persisted
+  // across launches in localStorage; a real sign-in clears it.
   offlineBypass: boolean;
   status: Status;
   error: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
-  continueOffline: () => void;
+  useLocally: () => void;
 }
 
 function toUser(u: User): AuthUser {
@@ -69,6 +69,25 @@ function markHadSession(on: boolean): void {
     else localStorage.removeItem(HAD_SESSION_KEY);
   } catch {
     /* storage unavailable — the fallback simply won't be offered */
+  }
+}
+
+// Device-local marker that the user opted to use the app WITHOUT an account
+// (local-only). Persisted so the welcome choice isn't shown on every launch.
+const LOCAL_ONLY_KEY = "notetaker:auth:localOnly";
+function loadLocalOnly(): boolean {
+  try {
+    return localStorage.getItem(LOCAL_ONLY_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function markLocalOnly(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(LOCAL_ONLY_KEY, "1");
+    else localStorage.removeItem(LOCAL_ONLY_KEY);
+  } catch {
+    /* best-effort */
   }
 }
 
@@ -121,7 +140,8 @@ export const useAuth = create<AuthState>((set) => {
     onAuthStateChanged(fb.auth, (u) => {
       if (u) {
         markHadSession(true);
-        // A real session supersedes any offline fallback the user had chosen.
+        // A real account supersedes the offline / local-only choice the user made.
+        markLocalOnly(false);
         set({ user: toUser(u), hadSession: true, offlineBypass: false, ready: true, status: "idle", error: null });
         void startSync(fb.db, u.uid);
       } else {
@@ -138,7 +158,7 @@ export const useAuth = create<AuthState>((set) => {
     ready: !fb,
     user: null,
     hadSession: loadHadSession(),
-    offlineBypass: false,
+    offlineBypass: loadLocalOnly(),
     status: "idle",
     error: null,
 
@@ -174,15 +194,19 @@ export const useAuth = create<AuthState>((set) => {
         // Explicit sign-out is a deliberate "leave this device": drop the offline
         // fallback so the gate doesn't offer to reopen these local notes.
         markHadSession(false);
+        markLocalOnly(false);
         set({ hadSession: false, offlineBypass: false });
       } catch (e) {
         console.warn("sign out failed", e);
       }
     },
 
-    // Offline fallback (DC-1a): keep working on local notes when a prior session
-    // can't be refreshed (no network, expired token). Only ever offered when
-    // `hadSession` is true, so a never-signed-in user can't slip past the gate.
-    continueOffline: () => set({ offlineBypass: true, status: "idle", error: null }),
+    // Local-only choice (welcome screen): use the app without an account, with notes
+    // stored on this device. Persisted so a returning local user isn't re-prompted;
+    // a later sign-in clears it and migrates local maps into the account (DC-2a).
+    useLocally: () => {
+      markLocalOnly(true);
+      set({ offlineBypass: true, status: "idle", error: null });
+    },
   };
 });

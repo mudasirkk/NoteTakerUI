@@ -8,12 +8,12 @@ import {
   winIsMaximized,
 } from "../../platform/window";
 
-// Mandatory login gate (DC-1). It wraps the whole app shell: when Firebase is
-// configured, nothing inside renders until the user is signed in (or has chosen
-// the offline fallback). When Firebase is NOT configured the build has no auth at
-// all, so the gate is a pass-through and the app stays local-only exactly as
-// before. This component is the only new auth concept — sign-in itself still goes
-// through the existing authStore (browser popup vs. desktop loopback) (DC-1b).
+// Login gate. It wraps the whole app shell: when Firebase is configured, first
+// launch offers a choice — sign in with Google to sync across devices, OR use the
+// app without an account (local-only). Either unlocks the shell; sign-in is
+// optional and can be done later from the top bar. When Firebase is NOT configured
+// the build has no auth at all and the gate is a pass-through. Sign-in itself still
+// goes through the existing authStore (browser popup vs. desktop loopback).
 
 const IconMin = () => (
   <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
@@ -87,11 +87,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const ready = useAuth((s) => s.ready);
   const user = useAuth((s) => s.user);
   const offlineBypass = useAuth((s) => s.offlineBypass);
-  const hadSession = useAuth((s) => s.hadSession);
   const status = useAuth((s) => s.status);
   const error = useAuth((s) => s.error);
   const signIn = useAuth((s) => s.signIn);
-  const continueOffline = useAuth((s) => s.continueOffline);
+  const useLocally = useAuth((s) => s.useLocally);
 
   // Local-only build: no Firebase, no accounts, no gate — run as before.
   if (!configured) return <>{children}</>;
@@ -123,9 +122,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
       <div className="authgate-body">
         <div className="authgate-card" role="dialog" aria-label="Sign in">
           <div className="authgate-brand">NoteTaker</div>
-          <h1 className="authgate-title">Sign in to your notes</h1>
+          <h1 className="authgate-title">Sign in to sync your notes</h1>
           <p className="authgate-sub">
-            Your maps live in your Google account, synced to every device you sign in on.
+            Sign in with Google to keep your maps in your account, synced to every device —
+            or use the app without an account and keep everything on this device.
           </p>
           <button className="authgate-google" onClick={() => void signIn()} disabled={busy}>
             <GoogleMark />
@@ -139,11 +139,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
               </button>
             </div>
           )}
-          {hadSession && (
-            <button className="authgate-offline" onClick={continueOffline}>
-              Continue offline with your local notes
-            </button>
-          )}
+          <div className="authgate-or"><span>or</span></div>
+          <button className="authgate-offline" onClick={useLocally} disabled={busy}>
+            Use without an account
+          </button>
+          <p className="authgate-localnote">
+            Your notes stay on this device. You can sign in anytime to sync.
+          </p>
         </div>
       </div>
     </div>

@@ -37,97 +37,21 @@ in with Google to keep the same library in sync across every device.
 
 ---
 
-## Run it
+## Getting started
 
-### Option 1 — Download a prebuilt installer (easiest)
+1. **Download the installer** for your OS from the
+   [**Releases**](https://github.com/mudasirkk/NoteTakerUI/releases) page and run it.
+2. **On first launch, choose how you want to work:**
+   - **Sign in with Google** — your notes are saved to your account and stay in sync
+     on every device you sign in on.
+   - **Use without an account** — everything stays on this device. You can sign in
+     later to start syncing; the local notes you already made come with you.
 
-Grab the installer for your OS from the [**Releases**](https://github.com/mudasirkk/NoteTakerUI/releases)
-page and run it. (Releases are produced automatically from version tags — see
-[Releasing](#releasing-for-maintainers) — so this option lights up once the first
-tag is pushed.)
+That's the whole setup — there's nothing to configure. Sign-in is optional, and you
+can switch from local to signed-in (or back) whenever you like.
 
-### Option 2 — Build from source
-
-**Prerequisites**
-
-- [Node.js](https://nodejs.org) 18+ and npm
-- [Rust](https://rustup.rs) (stable toolchain)
-- Tauri 2 system dependencies for your OS — see the
-  [Tauri prerequisites guide](https://tauri.app/start/prerequisites/)
-
-```bash
-git clone https://github.com/mudasirkk/NoteTakerUI.git
-cd NoteTakerUI
-npm install
-
-# Desktop app (Tauri):
-npm run tauri dev      # run in development
-npm run tauri build    # produce an installer in src-tauri/target/release/bundle/
-
-# Or run the plain web build in a browser (no desktop features):
-npm run dev
-```
-
----
-
-## Configuration
-
-**NoteTaker runs 100% locally with zero setup** — notes are saved on your device and
-nothing leaves it. Google sign-in and cloud sync are entirely optional and switched
-on with environment variables. Copy the template to get started:
-
-```bash
-cp .env.example .env.local
-```
-
-> `.env.local` is git-ignored and never committed.
-
-### Cloud sync + Google sign-in (optional)
-
-1. Create a project in the [Firebase console](https://console.firebase.google.com).
-2. Under **Authentication → Sign-in method**, enable **Google**.
-3. Create a **Cloud Firestore** database.
-4. Deploy the owner-only security rules shipped in this repo:
-   ```bash
-   firebase deploy --only firestore:rules
-   ```
-5. Copy your Firebase **web** config into `.env.local`:
-   - `VITE_FIREBASE_API_KEY`
-   - `VITE_FIREBASE_AUTH_DOMAIN`
-   - `VITE_FIREBASE_PROJECT_ID`
-   - `VITE_FIREBASE_APP_ID`
-
-   These are web-config values, **not secrets** — they are meant to ship to the
-   client. Access to your notes is controlled by `firestore.rules`, not by hiding
-   these keys.
-
-### Desktop (Tauri) Google sign-in
-
-The browser build uses Google's popup flow. The desktop app can't use popups, so it
-runs a system-browser **loopback OAuth** flow that needs a Google **Desktop app**
-OAuth client (Google Cloud Console → APIs & Services → Credentials). Add to
-`.env.local`:
-
-- `VITE_GOOGLE_DESKTOP_CLIENT_ID`
-- `VITE_GOOGLE_DESKTOP_CLIENT_SECRET`
-
-### Local YouTube playback (optional, advanced)
-
-When a video can't be embedded, NoteTaker can download it with
-[`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and play it locally so click-to-seek
-keeps working. It is configured with:
-
-- `NOTETAKER_YTDLP` — path to the `yt-dlp` binary (otherwise it's looked up on `PATH`)
-- `NOTETAKER_YTDLP_SHA256` — pin the binary's SHA-256 checksum; a mismatch aborts the
-  download (a supply-chain safeguard)
-
-Downloads are confined to a capped, evictable on-disk cache keyed by video id. Only
-the **URL** is ever stored in a map — video files are never uploaded to your account.
-
-> ⚠️ **Note:** downloading content from YouTube may violate YouTube's Terms of
-> Service. This feature is intended for content you own or have the right to
-> download, and you are responsible for how you use it. It is off unless you
-> configure `yt-dlp` as above.
+> Releases are produced automatically from version tags, so this download lights up
+> once the first installer has been published.
 
 ---
 
@@ -165,11 +89,11 @@ Press `?` in the app for the live, always-current list.
 
 - **Local-only mode** — each map is a JSON file in the app's per-user data directory,
   with an index sidecar. Nothing is sent anywhere.
-- **Signed in** — maps live in Firestore under `users/<your-uid>/maps/<id>`, guarded by
-  `firestore.rules` so only you can read or write them. The first time you sign in,
-  any existing local maps are migrated into your account. Edits made offline are
-  queued and reconciled on reconnect; conflicting edits fork to a kept-both copy
-  rather than silently overwriting.
+- **Signed in** — your maps live in the cloud under your own account, guarded so only
+  you can read or write them. The first time you sign in, any existing local maps are
+  migrated into your account. Edits made offline are queued and reconciled on
+  reconnect; conflicting edits fork to a kept-both copy rather than silently
+  overwriting.
 
 ---
 
@@ -189,7 +113,95 @@ firestore.rules Owner-only Firestore security rules
 
 ---
 
-## Releasing (for maintainers)
+## Running your own instance (maintainers)
+
+Everything in this section is for **developing NoteTaker or hosting your own copy**
+against your own Firebase backend. **End users don't need any of this** — they just
+download the app and (optionally) sign in. The published installers already point at
+the maintained backend, so a downloader never configures Firebase, OAuth, or
+environment variables.
+
+### Build from source
+
+**Prerequisites**
+
+- [Node.js](https://nodejs.org) 18+ and npm
+- [Rust](https://rustup.rs) (stable toolchain)
+- Tauri 2 system dependencies for your OS — see the
+  [Tauri prerequisites guide](https://tauri.app/start/prerequisites/)
+
+```bash
+git clone https://github.com/mudasirkk/NoteTakerUI.git
+cd NoteTakerUI
+npm install
+
+# Desktop app (Tauri):
+npm run tauri dev      # run in development
+npm run tauri build    # produce an installer in src-tauri/target/release/bundle/
+
+# Or run the plain web build in a browser (no desktop features):
+npm run dev
+```
+
+With no configuration the app runs **100% locally** — notes are saved on the device
+and nothing leaves it. The steps below enable Google sign-in and cloud sync against
+**your** Firebase project. Copy the template to get started:
+
+```bash
+cp .env.example .env.local
+```
+
+> `.env.local` is git-ignored and never committed.
+
+### Cloud sync + Google sign-in (your Firebase project)
+
+1. Create a project in the [Firebase console](https://console.firebase.google.com).
+2. Under **Authentication → Sign-in method**, enable **Google**.
+3. Create a **Cloud Firestore** database.
+4. Deploy the owner-only security rules shipped in this repo:
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+5. Copy your Firebase **web** config into `.env.local`:
+   - `VITE_FIREBASE_API_KEY`
+   - `VITE_FIREBASE_AUTH_DOMAIN`
+   - `VITE_FIREBASE_PROJECT_ID`
+   - `VITE_FIREBASE_APP_ID`
+
+   These are web-config values, **not secrets** — they are meant to ship to the
+   client. Access to notes is controlled by `firestore.rules`, not by hiding these
+   keys. Every signed-in user's data is isolated under `users/<their-uid>/maps/<id>`,
+   so one Firebase project safely backs all of your users.
+
+### Desktop (Tauri) Google sign-in
+
+The browser build uses Google's popup flow. The desktop app can't use popups, so it
+runs a system-browser **loopback OAuth** flow that needs a Google **Desktop app**
+OAuth client (Google Cloud Console → APIs & Services → Credentials). Add to
+`.env.local`:
+
+- `VITE_GOOGLE_DESKTOP_CLIENT_ID`
+- `VITE_GOOGLE_DESKTOP_CLIENT_SECRET`
+
+### Local YouTube playback (optional, advanced)
+
+When a video can't be embedded, NoteTaker can download it with
+[`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and play it locally so click-to-seek
+keeps working. It is configured with:
+
+- `NOTETAKER_YTDLP` — path to the `yt-dlp` binary (otherwise it's looked up on `PATH`)
+- `NOTETAKER_YTDLP_SHA256` — pin the binary's SHA-256 checksum; a mismatch aborts the
+  download (a supply-chain safeguard)
+
+Downloads are confined to a capped, evictable on-disk cache keyed by video id. Only
+the **URL** is ever stored in a map — video files are never uploaded to any account.
+
+> ⚠️ **Note:** downloading content from YouTube may violate YouTube's Terms of
+> Service. This feature is intended for content you own or have the right to
+> download, and you are responsible for how you use it. It is off unless you
+> configure `yt-dlp` as above.
+
+### Releasing
 
 Pushing a version tag triggers the [release workflow](.github/workflows/release.yml),
 which builds installers for Windows, macOS (Intel + Apple Silicon) and Linux and
@@ -200,9 +212,10 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-To bake Firebase + Google sign-in into the released binaries, add the `VITE_*` values
-from your `.env.local` as repository **Secrets** (Settings → Secrets and variables →
-Actions). Without them, the released installers run in local-only mode.
+To bake your Firebase + Google sign-in into the released binaries (so downloaders can
+sign in without any setup of their own), add the `VITE_*` values from your
+`.env.local` as repository **Secrets** (Settings → Secrets and variables → Actions).
+Without them, the released installers run in local-only mode.
 
 ---
 
