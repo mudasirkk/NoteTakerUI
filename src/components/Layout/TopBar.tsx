@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "../../state/store";
 import { formatTime } from "../../util/time";
 import { winClose, winMinimize, winToggleMaximize, winIsMaximized } from "../../platform/window";
 import { AccountButton } from "../Auth/AccountButton";
+import { LAYOUTS, LAYOUT_META } from "../../platform/layout";
 
 // Crisp Windows-style control glyphs (SVG so they stay sharp at any DPI).
 const IconMin = () => (
@@ -33,8 +34,29 @@ export function TopBar() {
   const view = useStore((s) => s.view);
   const autoStamp = useStore((s) => s.autoStamp);
   const theme = useStore((s) => s.theme);
-  const { setTitle, setView, toggleAutoStamp, resetSession, elapsed, setMaps, cycleTheme } =
+  const layout = useStore((s) => s.layout);
+  const { setTitle, setView, toggleAutoStamp, resetSession, elapsed, setMaps, cycleTheme, setLayout } =
     useStore.getState();
+
+  // Layout switcher popover (one of the three switch entry points). Closes on an
+  // outside click or Escape; picking a layout applies it and closes.
+  const [layoutOpen, setLayoutOpen] = useState(false);
+  const layoutRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!layoutOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (layoutRef.current && !layoutRef.current.contains(e.target as Node)) setLayoutOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLayoutOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [layoutOpen]);
 
   // Tick to keep the session timer live.
   const [, setTick] = useState(0);
@@ -133,6 +155,41 @@ export function TopBar() {
         >
           ▤ maps
         </button>
+        <div className="lay-wrap" ref={layoutRef}>
+          <button
+            className="lay-btn"
+            onClick={() => setLayoutOpen((o) => !o)}
+            title="Window layout — cycle with Ctrl+\"
+            aria-haspopup="menu"
+            aria-expanded={layoutOpen}
+          >
+            {LAYOUT_META[layout].icon} layout
+          </button>
+          {layoutOpen && (
+            <div className="lay-pop" role="menu" aria-label="Window layout">
+              {LAYOUTS.map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={l === layout}
+                  className={"lay-opt" + (l === layout ? " on" : "")}
+                  title={LAYOUT_META[l].desc}
+                  onClick={() => {
+                    setLayout(l);
+                    setLayoutOpen(false);
+                  }}
+                >
+                  <span className="lay-ic" aria-hidden>
+                    {LAYOUT_META[l].icon}
+                  </span>
+                  <span className="lay-name">{LAYOUT_META[l].label}</span>
+                  {l === layout && <span className="lay-key">on</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button
           className="theme-btn"
           onClick={cycleTheme}

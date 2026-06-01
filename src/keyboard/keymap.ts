@@ -35,6 +35,7 @@ export const KEYMAP: Binding[] = [
   { combo: "Ctrl+← / Ctrl+→", action: "Rewind / forward", group: "Player" },
   { combo: "Ctrl+⇧< / Ctrl+⇧>", action: "Slower / faster", group: "Player" },
   { combo: "Ctrl+M", action: "Outline / Map", group: "App", footer: true, short: "map" },
+  { combo: "Ctrl+\\ / Ctrl+⇧\\", action: "Cycle layout / reverse", group: "App" },
   { combo: "Ctrl+S", action: "Save", group: "App" },
   { combo: "?", action: "Keyboard shortcuts", group: "App" },
   { combo: "Ctrl+Alt+N", action: "Show / hide window", group: "App" },

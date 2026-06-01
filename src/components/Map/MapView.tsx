@@ -173,8 +173,8 @@ export function MapView() {
         target: l.to,
         type: "link",
         animated: true,
-        markerEnd: { type: MarkerType.ArrowClosed, color: "#7c5cff" },
-        style: { stroke: "#7c5cff", strokeDasharray: "5 4" },
+        markerEnd: { type: MarkerType.ArrowClosed, color: "#9d8cff" },
+        style: { stroke: "#9d8cff", strokeDasharray: "5 4" },
       }));
     return { nodes: laid, edges: [...hierEdges, ...linkEdges] };
   }, [allNodes, links, selectedId, canSeek]);
@@ -250,7 +250,7 @@ export function MapView() {
         minZoom={0.2}
         maxZoom={1.6}
       >
-        <Background gap={20} size={1} color="rgba(33,28,22,0.07)" />
+        <Background gap={20} size={1} color="rgba(127,140,160,0.12)" />
         <Controls showInteractive={false}>
           <ControlButton onClick={() => setFs((v) => !v)} title={fs ? "Exit fullscreen (Esc)" : "Fullscreen map"}>
             {fs ? (

@@ -121,6 +121,11 @@ export function useGlobalKeys(): void {
       } else if (k === "t") {
         e.preventDefault();
         if (st.selectedId) st.stamp(st.selectedId);
+      } else if (e.code === "Backslash") {
+        // Cycle the v2 shell layout; Shift reverses. Keyed off e.code because the
+        // shifted backslash reports as "|" on US layouts.
+        e.preventDefault();
+        st.cycleLayout(e.shiftKey ? -1 : 1);
       }
     };
     window.addEventListener("keydown", handler);

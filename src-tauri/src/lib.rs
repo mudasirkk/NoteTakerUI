@@ -178,6 +178,239 @@ fn verify_ytdlp(path: &std::path::Path) -> Result<(), String> {
     Ok(())
 }
 
+// ---------- ffmpeg: optional, unlocks >720p merged downloads ----------
+// YouTube only serves ≤720p as a single pre-muxed file; 1080p comes as separate
+// video + audio streams that must be merged, which yt-dlp does with ffmpeg. ffmpeg
+// is therefore optional: without it we fetch the best progressive ≤720p copy; with
+// it we fetch up to 1080p and merge to mp4. We never bundle it or install it
+// silently — the UI tells the user it's needed and we fetch it only when they
+// explicitly accept (the download_ffmpeg command below).
+
+// The latest "essentials" Windows build. gyan.dev is the build host recommended by
+// ffmpeg.org; the URL always points at the current release and is fetched over TLS.
+#[cfg(windows)]
+const FFMPEG_WIN_URL: &str = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
+
+// Where our downloaded ffmpeg lives: app-data/bin (persistent — unlike the yt cache,
+// we don't want it evicted). ffmpeg.exe and ffprobe.exe sit side by side here.
+fn ffmpeg_bin_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    Ok(app_data(app)?.join("bin"))
+}
+
+// Locate ffmpeg: an explicit override (NOTETAKER_FFMPEG), then our own downloaded
+// copy under app-data/bin, then a PATH search. Returns the binary path; its parent
+// dir is what we hand yt-dlp via --ffmpeg-location (so it finds ffprobe too).
+fn resolve_ffmpeg(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    if let Ok(p) = std::env::var("NOTETAKER_FFMPEG") {
+        let pb = std::path::PathBuf::from(p);
+        if pb.is_file() {
+            return Some(pb);
+        }
+    }
+    let exe = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
+    if let Ok(dir) = ffmpeg_bin_dir(app) {
+        let candidate = dir.join(exe);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    let path_var = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path_var) {
+        let candidate = dir.join(exe);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+// Whether ffmpeg is available right now. The UI calls this before a download to
+// decide whether to offer the (consent-gated) install or go straight to HD.
+#[tauri::command]
+fn ffmpeg_available(app: tauri::AppHandle) -> bool {
+    resolve_ffmpeg(&app).is_some()
+}
+
+// Download ffmpeg into app-data/bin on the user's explicit acceptance. Idempotent:
+// if ffmpeg is already resolvable (downloaded before, on PATH, or pinned via env)
+// it's a no-op. Windows only for now — elsewhere we point the user at their package
+// manager rather than guess a binary distribution.
+fn run_download_ffmpeg(app: tauri::AppHandle) -> Result<(), String> {
+    if resolve_ffmpeg(&app).is_some() {
+        return Ok(());
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = &app;
+        return Err("Automatic ffmpeg install is only supported on Windows here. Please \
+            install ffmpeg with your package manager (e.g. `brew install ffmpeg` or \
+            `sudo apt install ffmpeg`) and restart NoteTaker."
+            .to_string());
+    }
+
+    #[cfg(windows)]
+    {
+        let dir = ffmpeg_bin_dir(&app)?;
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+
+        // ureq's native-tls backend isn't auto-wired by the feature flag — the bare
+        // helpers ship no TLS connector. Build it explicitly (see run_google_oauth).
+        let tls = native_tls::TlsConnector::new().map_err(|e| e.to_string())?;
+        let agent = ureq::AgentBuilder::new()
+            .tls_connector(std::sync::Arc::new(tls))
+            .build();
+
+        // Pull the (~40 MB) zip fully into memory. into_reader() is unbounded, unlike
+        // into_string()'s ~10 MB cap, so it's the right call for a binary payload.
+        use std::io::Read as _;
+        let resp = agent
+            .get(FFMPEG_WIN_URL)
+            .call()
+            .map_err(|e| format!("couldn't download ffmpeg: {e}"))?;
+        let mut bytes: Vec<u8> = Vec::new();
+        resp.into_reader()
+            .read_to_end(&mut bytes)
+            .map_err(|e| format!("couldn't read the ffmpeg download: {e}"))?;
+
+        // Best-effort supply-chain guard, mirroring verify_ytdlp: gyan publishes a
+        // .sha256 sidecar. When we can fetch and parse it a mismatch is fatal; if it's
+        // unavailable we still proceed (the bytes came over TLS from the pinned host)
+        // but log it, so a sidecar format change can't break the install outright.
+        match agent.get(&format!("{FFMPEG_WIN_URL}.sha256")).call() {
+            Ok(sum_resp) => {
+                let sum_text = sum_resp.into_string().unwrap_or_default();
+                let expected = sum_text
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_ascii_lowercase();
+                if expected.len() == 64 {
+                    let actual = hex_sha256(&bytes);
+                    if actual != expected {
+                        return Err(format!(
+                            "ffmpeg checksum mismatch (expected {expected}, got {actual}) — refusing to install"
+                        ));
+                    }
+                } else {
+                    log::warn!("ffmpeg checksum sidecar was unparseable; proceeding unverified");
+                }
+            }
+            Err(e) => log::warn!("couldn't fetch ffmpeg checksum sidecar ({e}); proceeding unverified"),
+        }
+
+        // Extract only ffmpeg.exe / ffprobe.exe. We write to fixed names we control in
+        // our own dir (never the archive-supplied path), so a crafted entry name can't
+        // escape via path traversal (zip-slip).
+        let reader = std::io::Cursor::new(bytes);
+        let mut archive =
+            zip::ZipArchive::new(reader).map_err(|e| format!("ffmpeg archive unreadable: {e}"))?;
+        let mut got_ffmpeg = false;
+        for i in 0..archive.len() {
+            let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
+            if !entry.is_file() {
+                continue;
+            }
+            let base = entry
+                .name()
+                .rsplit(['/', '\\'])
+                .next()
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            let dest = match base.as_str() {
+                "ffmpeg.exe" => dir.join("ffmpeg.exe"),
+                "ffprobe.exe" => dir.join("ffprobe.exe"),
+                _ => continue,
+            };
+            let tmp = dest.with_extension("part");
+            let mut out = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
+            std::io::copy(&mut entry, &mut out).map_err(|e| e.to_string())?;
+            drop(out);
+            std::fs::rename(&tmp, &dest).map_err(|e| e.to_string())?;
+            if base == "ffmpeg.exe" {
+                got_ffmpeg = true;
+            }
+        }
+        if !got_ffmpeg {
+            return Err("ffmpeg.exe was not found inside the downloaded archive".to_string());
+        }
+        Ok(())
+    }
+}
+
+// Off the async runtime: the fetch + unzip is blocking and can take a while.
+#[tauri::command]
+async fn download_ffmpeg(app: tauri::AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || run_download_ffmpeg(app))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+// ---------- YouTube cookies (optional, for signed-in / higher-quality formats) ----------
+// YouTube now gates most >720p formats behind sign-in + PO tokens (the SABR
+// experiment), so a logged-out yt-dlp often only sees 360p. Handing it a cookies.txt
+// the user exported from their signed-in browser lets it fetch what that account can
+// see. We keep a copy in app-data and pass it via --cookies. The file holds the
+// user's auth cookies, so we never log its contents; the picker is opened here in
+// Rust (SEC-3) — the webview supplies no path.
+
+fn yt_cookies_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    Ok(app_data(app)?.join("yt-cookies.txt"))
+}
+
+// Locate the cookies file: an explicit override (NOTETAKER_YT_COOKIES), else the copy
+// the user imported. None when cookies haven't been configured.
+fn resolve_cookies(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    if let Ok(p) = std::env::var("NOTETAKER_YT_COOKIES") {
+        let pb = std::path::PathBuf::from(p);
+        if pb.is_file() {
+            return Some(pb);
+        }
+    }
+    let p = yt_cookies_path(app).ok()?;
+    p.is_file().then_some(p)
+}
+
+// Whether a cookies file is configured (the UI reflects this).
+#[tauri::command]
+fn youtube_cookies_status(app: tauri::AppHandle) -> bool {
+    resolve_cookies(&app).is_some()
+}
+
+// Forget the imported cookies file.
+#[tauri::command]
+fn clear_youtube_cookies(app: tauri::AppHandle) -> Result<(), String> {
+    let path = yt_cookies_path(&app)?;
+    match std::fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+// Let the user pick a cookies.txt; copy it into app-data for yt-dlp to use. Returns
+// false if they cancel. async so the blocking native dialog runs off the main thread
+// (mirrors export_text_file).
+#[tauri::command]
+async fn set_youtube_cookies(app: tauri::AppHandle) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked = app
+        .dialog()
+        .file()
+        .add_filter("Cookies file (cookies.txt)", &["txt"])
+        .blocking_pick_file();
+    let Some(file_path) = picked else {
+        return Ok(false); // cancelled
+    };
+    let src = file_path.into_path().map_err(|e| e.to_string())?;
+    let dest = yt_cookies_path(&app)?;
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::copy(&src, &dest).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
 // Evict least-recently-downloaded files until the cache fits the cap (DC-3c). Never
 // removes `keep` (the file we just produced). Best-effort: any error is ignored so
 // eviction can't fail an otherwise-successful download.
@@ -231,14 +464,26 @@ fn youtube_cached_path(app: tauri::AppHandle, url: String) -> Result<Option<Stri
     }
 }
 
-fn run_youtube_download(app: tauri::AppHandle, url: String) -> Result<String, String> {
+fn run_youtube_download(app: tauri::AppHandle, url: String, force: bool) -> Result<String, String> {
     use tauri::Manager;
     let id = parse_youtube_id(&url).ok_or_else(|| "not a recognized YouTube URL".to_string())?;
     let dir = yt_cache_dir(&app)?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
-    // Cache hit → reuse it; no second download (DC-3c).
-    if let Some(path) = yt_find_cached(&dir, &id) {
+    if force {
+        // Re-download requested (e.g. after importing cookies or installing ffmpeg):
+        // drop the existing copy and any leftover fragments for this id so we fetch
+        // fresh at the best quality the current setup allows, rather than reuse cache.
+        if let Ok(rd) = std::fs::read_dir(&dir) {
+            let prefix = format!("{id}.");
+            for entry in rd.flatten() {
+                if entry.file_name().to_string_lossy().starts_with(&prefix) {
+                    let _ = std::fs::remove_file(entry.path());
+                }
+            }
+        }
+    } else if let Some(path) = yt_find_cached(&dir, &id) {
+        // Cache hit → reuse it; no second download (DC-3c).
         app.asset_protocol_scope()
             .allow_file(&path)
             .map_err(|e| e.to_string())?;
@@ -256,12 +501,35 @@ fn run_youtube_download(app: tauri::AppHandle, url: String) -> Result<String, St
     let out_template = dir.join(format!("{id}.%(ext)s"));
 
     let mut cmd = std::process::Command::new(&ytdlp);
-    cmd.arg("--no-playlist")
-        .arg("--no-part")
-        .arg("--no-mtime")
-        .arg("-f")
-        .arg("best[ext=mp4][height<=?720]/best[ext=mp4]/mp4/best")
-        .arg("-o")
+    cmd.arg("--no-playlist").arg("--no-part").arg("--no-mtime");
+    match resolve_ffmpeg(&app) {
+        // ffmpeg present: take the best video up to 1080p plus the best audio (two
+        // DASH streams) and merge them to mp4. The soft `<=?1080` prefers ≤1080p but
+        // won't fail if only higher rungs exist; the trailing /best[ext=mp4]/best keep
+        // a single-file fallback. --ffmpeg-location gets the dir (so ffprobe is found).
+        Some(ff) => {
+            cmd.arg("-f")
+                .arg("bestvideo[ext=mp4][height<=?1080]+bestaudio[ext=m4a]/bestvideo[height<=?1080]+bestaudio/best[ext=mp4]/best")
+                .arg("--merge-output-format")
+                .arg("mp4")
+                .arg("--ffmpeg-location")
+                .arg(ff.parent().unwrap_or(ff.as_path()));
+        }
+        // No ffmpeg: the best single pre-muxed file. YouTube caps these near 720p, but
+        // it needs no merge step, so high-quality stays strictly opt-in (needs ffmpeg).
+        None => {
+            cmd.arg("-f")
+                .arg("best[ext=mp4][height<=?720]/best[ext=mp4]/mp4/best");
+        }
+    }
+    // If the user has imported a cookies.txt, pass it so yt-dlp can fetch
+    // signed-in / higher-quality formats that YouTube otherwise gates behind
+    // an account (sidesteps the Windows browser-cookie decryption failures).
+    // The path is a controlled app-data file; its contents are never logged.
+    if let Some(cookies) = resolve_cookies(&app) {
+        cmd.arg("--cookies").arg(cookies);
+    }
+    cmd.arg("-o")
         .arg(&out_template)
         .arg("--") // end of options: the URL after this can never be read as a flag
         .arg(&url); // a single argv element — never shell-interpolated (DC-3b)
@@ -300,8 +568,13 @@ fn run_youtube_download(app: tauri::AppHandle, url: String) -> Result<String, St
 // its on-disk path. Runs off the async runtime because it shells out and can take a
 // while; mirrors the desktop_google_sign_in spawn_blocking pattern.
 #[tauri::command]
-async fn download_youtube(app: tauri::AppHandle, url: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || run_youtube_download(app, url))
+async fn download_youtube(
+    app: tauri::AppHandle,
+    url: String,
+    force: Option<bool>,
+) -> Result<String, String> {
+    let force = force.unwrap_or(false);
+    tauri::async_runtime::spawn_blocking(move || run_youtube_download(app, url, force))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -763,6 +1036,11 @@ pub fn run() {
             allow_video_path,
             download_youtube,
             youtube_cached_path,
+            ffmpeg_available,
+            download_ffmpeg,
+            youtube_cookies_status,
+            clear_youtube_cookies,
+            set_youtube_cookies,
             save_map,
             load_map,
             list_maps,

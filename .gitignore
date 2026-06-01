@@ -26,11 +26,13 @@ yarn-error.log*
 .vscode/*
 !.vscode/extensions.json
 .idea/
+.claude/
 .DS_Store
 Thumbs.db
 
 # ---- internal design docs (kept local, not published) ----
 audit.html
 plan.html
+plan-v2.html
 PLAN.md
 firebase-debug.log

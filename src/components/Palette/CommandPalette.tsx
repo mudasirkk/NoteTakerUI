@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../../state/store";
 import { useFocusTrap } from "../../keyboard/useFocusTrap";
 import { importTranscriptFile } from "../../transcript/import";
+import { LAYOUTS, LAYOUT_META } from "../../platform/layout";
 
 type Cmd = {
   id: string;
@@ -12,10 +13,10 @@ type Cmd = {
 };
 
 const COLORS = [
-  { name: "Red", value: "#d6451f" },
-  { name: "Amber", value: "#b08524" },
-  { name: "Teal", value: "#1f5e5b" },
-  { name: "Slate", value: "#5b6470" },
+  { name: "Teal", value: "#34e7c4" },
+  { name: "Amber", value: "#f4b454" },
+  { name: "Violet", value: "#9d8cff" },
+  { name: "Coral", value: "#ff6f61" },
 ];
 
 export function CommandPalette() {
@@ -121,6 +122,14 @@ export function CommandPalette() {
       { id: "theme-system", title: "Theme: System (match OS)", run: () => st.setTheme("system") },
       { id: "theme-light", title: "Theme: Light", run: () => st.setTheme("light") },
       { id: "theme-dark", title: "Theme: Dark", run: () => st.setTheme("dark") },
+      ...LAYOUTS.map(
+        (l): Cmd => ({
+          id: "layout-" + l,
+          title: `Layout: ${LAYOUT_META[l].label}`,
+          hint: l === "split" ? "Ctrl+\\" : undefined,
+          run: () => st.setLayout(l),
+        })
+      ),
       { id: "help", title: "Keyboard shortcuts", hint: "?", run: () => st.setHelp(true) },
       { id: "save", title: "Save now", hint: "Ctrl+S", run: () => st.save() },
       { id: "export-md", title: "Export to Markdown…", run: () => void st.exportMarkdown() },

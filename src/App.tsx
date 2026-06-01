@@ -1,8 +1,8 @@
 import { lazy, Suspense, useEffect } from "react";
 import { TopBar } from "./components/Layout/TopBar";
 import { StatusBar } from "./components/Layout/StatusBar";
+import { LayoutShell } from "./components/Layout/LayoutShell";
 import { OutlineView } from "./components/Outline/OutlineView";
-import { PlayerPanel } from "./components/Player/PlayerPanel";
 import { JumpPalette } from "./components/Palette/JumpPalette";
 import { CommandPalette } from "./components/Palette/CommandPalette";
 import { MapsSwitcher } from "./components/Palette/MapsSwitcher";
@@ -39,21 +39,18 @@ export default function App() {
     <div className="stage">
       <div className="app">
         <TopBar />
-        <main
-          className="body"
-          id="view-panel"
-          role="tabpanel"
-          aria-labelledby={view === "outline" ? "tab-outline" : "tab-map"}
-        >
-          {view === "outline" ? (
-            <OutlineView />
-          ) : (
-            <Suspense fallback={<div className="view-loading">Loading map…</div>}>
-              <MapView />
-            </Suspense>
-          )}
-        </main>
-        <PlayerPanel />
+        <LayoutShell
+          view={view}
+          notes={
+            view === "outline" ? (
+              <OutlineView />
+            ) : (
+              <Suspense fallback={<div className="view-loading">Loading map…</div>}>
+                <MapView />
+              </Suspense>
+            )
+          }
+        />
         <StatusBar />
         <footer className="hints">
           {FOOTER_HINTS.map((b) => (

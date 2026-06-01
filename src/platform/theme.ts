@@ -1,8 +1,9 @@
-// Theme preference (UI-5). Light is the CSS default (the :root tokens); choosing
-// "dark" or "light" sets a data-theme attribute on <html> that the dark token
-// block keys off, while "system" removes it and lets the prefers-color-scheme
-// media query decide. Applied once in main.tsx before first paint (no flash) and
-// again whenever the user changes it.
+// Theme preference (UI-5). Obsidian dark is the v2 signature and the default (the
+// :root tokens). Setting data-theme="light" switches to Daylight; data-theme="dark"
+// pins Obsidian even under a light OS; "system" removes the attribute and lets the
+// prefers-color-scheme media query decide. Per the locked v2 decision the app ships
+// dark, so a first launch defaults to "dark" rather than following the OS. Applied
+// once in main.tsx before first paint (no flash) and again whenever the user changes it.
 import { loadPref, savePref } from "./uiPrefs";
 
 export type ThemePref = "system" | "light" | "dark";
@@ -10,8 +11,8 @@ export type ThemePref = "system" | "light" | "dark";
 const KEY = "theme";
 
 export function loadTheme(): ThemePref {
-  const v = loadPref<ThemePref>(KEY, "system");
-  return v === "light" || v === "dark" ? v : "system";
+  const v = loadPref<ThemePref>(KEY, "dark");
+  return v === "light" || v === "system" ? v : "dark";
 }
 
 export function saveTheme(pref: ThemePref): void {

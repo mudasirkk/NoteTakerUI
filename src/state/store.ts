@@ -4,12 +4,20 @@ import * as ops from "./nodeOps";
 import { activeStore, saveSync, getActiveMapId, setActiveMapId } from "../storage/fileStore";
 import { ExternalController, type PlayerController } from "../player/PlayerController";
 import { pickVideoFile, resolveVideoUrl } from "../platform/dialog";
-import { downloadYouTube, cachedYouTube } from "../platform/youtubeDownload";
+import { downloadYouTube, cachedYouTube, ffmpegAvailable, installFfmpeg } from "../platform/youtubeDownload";
+import { isTauri } from "../platform/window";
 import { mapToMarkdown, suggestedFileName } from "../export/markdown";
 import { saveTextFile } from "../platform/exportFile";
 import { configureSync, pushLocalSave, pushLocalRemove, flushPush } from "../storage/sync";
 import { loadPref, savePref } from "../platform/uiPrefs";
 import { loadTheme, saveTheme, applyTheme, type ThemePref } from "../platform/theme";
+import {
+  type Layout,
+  DEFAULT_LAYOUT,
+  DEFAULT_SPLIT_RATIO,
+  clampRatio,
+  nextLayout,
+} from "../platform/layout";
 import { winSetAlwaysOnTop } from "../platform/window";
 
 // The session timer is always alive; it is also the active controller whenever
@@ -62,6 +70,10 @@ function clearHistory() {
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingMap: NoteMap | null = null;
+// Remembers whether a download that hit the ffmpeg gate was a forced re-download,
+// so the deferred fetch (after the user installs ffmpeg or skips it) keeps the
+// force semantics rather than reusing the low-quality cached copy.
+let pendingForce = false;
 function scheduleSave(map: NoteMap) {
   pendingMap = map;
   clearTimeout(saveTimer);
@@ -145,6 +157,10 @@ interface State {
   syncNotice: string | null; // transient sync message (migration / conflict) for the toast (DC-2a)
   pinned: boolean; // window always-on-top, user-toggleable + persisted (UX-5)
   theme: ThemePref; // system / light / dark, persisted (UI-5)
+  // v2 shell: one global, device-local layout pick + the shared divider position.
+  // Both persist through uiPrefs (never per-map, never synced).
+  layout: Layout;
+  splitRatio: number;
   zoomRootId: string | null;
   controller: PlayerController;
   rate: number;
@@ -153,7 +169,9 @@ interface State {
   // URL (DC-3c); this asset:// URL is transient per-device and, when present, the
   // player swaps the (embed-blocked) iframe for a seekable local <video>.
   ytLocalUrl: string | null;
-  ytStatus: "idle" | "downloading" | "ready" | "error";
+  // "needs-ffmpeg": waiting on the user to accept the ffmpeg install (or pick 720p);
+  // "installing-ffmpeg": fetching ffmpeg before a high-quality download.
+  ytStatus: "idle" | "needs-ffmpeg" | "installing-ffmpeg" | "downloading" | "ready" | "error";
   ytError: string | null;
 
   init: () => Promise<void>;
@@ -186,6 +204,9 @@ interface State {
   togglePin: () => void;
   setTheme: (pref: ThemePref) => void;
   cycleTheme: () => void;
+  setLayout: (layout: Layout) => void;
+  cycleLayout: (dir: 1 | -1) => void;
+  setSplitRatio: (ratio: number, persist?: boolean) => void;
   resetSession: () => void;
   undo: () => void;
   redo: () => void;
@@ -196,7 +217,9 @@ interface State {
   // Source + player (Phase 2)
   setSource: (source: SourceRef) => void;
   openLocalVideo: () => Promise<void>;
-  downloadActiveYouTube: () => Promise<void>;
+  downloadActiveYouTube: (opts?: { skipFfmpegCheck?: boolean; force?: boolean }) => Promise<void>;
+  installFfmpegThenDownload: () => Promise<void>;
+  skipFfmpegAndDownload: () => Promise<void>;
   setController: (c: PlayerController) => void;
   clearController: () => void;
   playPause: () => void;
@@ -299,6 +322,8 @@ export const useStore = create<State>((set, get) => {
     syncNotice: null,
     pinned: loadPref("pinned", true),
     theme: loadTheme(),
+    layout: loadPref<Layout>("layout", DEFAULT_LAYOUT),
+    splitRatio: loadPref<number>("splitRatio", DEFAULT_SPLIT_RATIO),
     zoomRootId: null,
     controller: sessionTimer,
     rate: 1,
@@ -487,6 +512,25 @@ export const useStore = create<State>((set, get) => {
       const order: ThemePref[] = ["system", "light", "dark"];
       get().setTheme(order[(order.indexOf(get().theme) + 1) % order.length]);
     },
+    // Layout (v2 shell): a single global pick, persisted device-local. Switching
+    // re-clamps the shared divider into the new layout's band so a wide split
+    // ratio doesn't leave theater's notes rail oversized.
+    setLayout: (layout) => {
+      savePref("layout", layout);
+      set({ layout, splitRatio: clampRatio(layout, get().splitRatio) });
+    },
+    cycleLayout: (dir) => {
+      const layout = nextLayout(get().layout, dir);
+      savePref("layout", layout);
+      set({ layout, splitRatio: clampRatio(layout, get().splitRatio) });
+    },
+    // The divider writes here on every pointermove (persist=false, cheap) and once
+    // more on release (persist=true) so only the final position hits storage.
+    setSplitRatio: (ratio, persist = false) => {
+      const splitRatio = clampRatio(get().layout, ratio);
+      if (persist) savePref("splitRatio", splitRatio);
+      set({ splitRatio });
+    },
     resetSession: () => {
       const now = Date.now();
       sessionTimer.setStart(now);
@@ -546,22 +590,67 @@ export const useStore = create<State>((set, get) => {
     // to a seekable local <video>. Fires automatically when the embed is blocked
     // (YouTubePlayer's onError) and is also offered as a manual action. Idempotent:
     // it won't start a second download or re-fetch once a local copy is ready.
-    downloadActiveYouTube: async () => {
+    downloadActiveYouTube: async (opts) => {
       const src = get().map.source;
       if (!src || src.type !== "youtube" || !src.url) return;
-      if (get().ytStatus === "downloading" || get().ytLocalUrl) return;
+      const st = get().ytStatus;
+      if (st === "downloading" || st === "installing-ffmpeg") return;
+      // A copy is already playing and this isn't a forced re-download → nothing to do.
+      if (get().ytLocalUrl && !opts?.force) return;
+      // High-quality (>720p) downloads need ffmpeg to merge YouTube's separate
+      // video+audio streams. If it's missing, stop and ask the user first (the ytbar
+      // then offers to install ffmpeg for 1080p, or grab a 720p copy now). We stash
+      // whether this was a forced re-download so the deferred fetch keeps that intent.
+      // Skipped once they've chosen, and never gates the browser (no shell there).
+      if (!opts?.skipFfmpegCheck && isTauri && !(await ffmpegAvailable())) {
+        pendingForce = opts?.force ?? false;
+        set({ ytStatus: "needs-ffmpeg", ytError: null });
+        return;
+      }
       const mapId = get().map.id;
       const url = src.url;
       set({ ytStatus: "downloading", ytError: null });
       try {
-        const local = await downloadYouTube(url);
+        const local = await downloadYouTube(url, opts?.force ?? false);
         if (get().map.id !== mapId) return; // user switched maps mid-download
-        if (local) set({ ytLocalUrl: local, ytStatus: "ready", ytError: null });
-        else set({ ytStatus: "idle" }); // browser: no native downloader, no-op
+        if (local) {
+          // The cached file path (and thus its asset:// URL) is stable per video id,
+          // so a forced re-download yields the same URL string — append a cache-buster
+          // so React reloads the <video> instead of keeping the stale copy on screen.
+          const busted = opts?.force
+            ? `${local}${local.includes("?") ? "&" : "?"}t=${Date.now()}`
+            : local;
+          set({ ytLocalUrl: busted, ytStatus: "ready", ytError: null });
+        } else set({ ytStatus: "idle" }); // browser: no native downloader, no-op
       } catch (e) {
         if (get().map.id !== mapId) return;
         set({ ytStatus: "error", ytError: e instanceof Error ? e.message : String(e) });
       }
+    },
+    // The user accepted the ffmpeg install: fetch it, then run the (now high-quality)
+    // download, preserving the forced-re-download intent stashed at the gate. On
+    // install failure we surface the error and stop, so the "Try again" path can retry.
+    installFfmpegThenDownload: async () => {
+      const st = get().ytStatus;
+      if (st === "downloading" || st === "installing-ffmpeg") return;
+      const src = get().map.source;
+      if (!src || src.type !== "youtube" || !src.url) return;
+      const force = pendingForce;
+      set({ ytStatus: "installing-ffmpeg", ytError: null });
+      try {
+        await installFfmpeg();
+      } catch (e) {
+        set({ ytStatus: "error", ytError: e instanceof Error ? e.message : String(e) });
+        return;
+      }
+      // Hand back to the normal path with the ffmpeg check already satisfied.
+      set({ ytStatus: "idle" });
+      await get().downloadActiveYouTube({ skipFfmpegCheck: true, force });
+    },
+    // The user declined ffmpeg and wants the 720p copy now: download straight away,
+    // bypassing the ffmpeg gate but keeping any forced-re-download intent.
+    skipFfmpegAndDownload: async () => {
+      await get().downloadActiveYouTube({ skipFfmpegCheck: true, force: pendingForce });
     },
     setController: (c) => set({ controller: c }),
     clearController: () => set({ controller: sessionTimer }),
