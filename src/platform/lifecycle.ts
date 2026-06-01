@@ -25,16 +25,24 @@ export function installExitFlush(): () => void {
         const win = getCurrentWindow();
         let closing = false;
         const un = await win.onCloseRequested(async (event) => {
-          // First pass: hold the window open, flush, then close for real. The
-          // second close() re-enters here with `closing` set, so we fall through
-          // and let it proceed.
+          // Hold the close, flush the last edit, then tear the window down with
+          // destroy(). A re-entrant close() here is NOT reliably honored by Tauri
+          // from inside its own close-requested handler (the window never actually
+          // goes away); destroy() closes immediately and skips this event, so it's
+          // the correct "async cleanup, then close" primitive. The flush is bounded
+          // by a timeout so a stuck save can never trap the user with a dead X.
           if (closing) return;
           closing = true;
           event.preventDefault();
           try {
-            await flushPendingSaveAsync();
+            await Promise.race([
+              flushPendingSaveAsync(),
+              new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+            ]);
+          } catch (e) {
+            console.warn("flush on close failed", e);
           } finally {
-            await win.close();
+            await win.destroy();
           }
         });
         if (disposed) un();
