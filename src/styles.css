@@ -170,6 +170,22 @@ body {
   overflow: hidden;
 }
 
+/* On the frameless desktop build the app fills the window edge-to-edge: drop the
+   stage inset and dotted backdrop, and strip the card frame (border/radius/shadow).
+   Otherwise the 18px padding is a dead, non-draggable margin that makes the window
+   look bigger than the app, and rounded corners would leak the backdrop at the
+   window edges. The browser build keeps its floating-card look. Gated by the
+   data-platform marker set in main.tsx before first paint. */
+[data-platform="desktop"] .stage {
+  padding: 0;
+  background-image: none;
+}
+[data-platform="desktop"] .app {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 /* ---------- top bar ---------- */
 .appbar { background: var(--bar-grad); border-bottom: 1px solid var(--line); }
 .bar-top { display: flex; align-items: center; gap: 10px; padding: 10px 12px 6px; }

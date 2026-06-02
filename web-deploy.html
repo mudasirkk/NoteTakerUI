@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NoteTaker on the Web — Deployment Choice, Impact &amp; Build Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#f3ede1;
+    --paper-2:#ece3d2;
+    --paper-3:#e4d9c3;
+    --ink:#211c16;
+    --ink-soft:#6a5f4f;
+    --ink-faint:#9c8f78;
+    --rule:#d7cab1;
+    --accent:#d6451f;
+    --accent-deep:#b2360f;
+    --teal:#1f5e5b;
+    --green:#4f7a32;
+    --green-deep:#3a5d23;
+    --gold:#b08524;
+    --blue:#2f5d86;
+    --shadow:0 24px 60px -20px rgba(33,28,22,.45),0 8px 20px -12px rgba(33,28,22,.3);
+    --maxw:1180px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:radial-gradient(140% 90% at 90% -10%, #f7f2e8 0%, var(--paper) 42%, var(--paper-2) 100%);
+    color:var(--ink);
+    font-family:"Newsreader",Georgia,serif;
+    font-size:18px;line-height:1.62;
+    -webkit-font-smoothing:antialiased;overflow-x:hidden;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+    background-image:linear-gradient(var(--rule) 1px,transparent 1px);
+    background-size:100% 32px;mix-blend-mode:multiply;-webkit-mask-image:linear-gradient(transparent,#000 6%,#000 94%,transparent);
+  }
+  .grain{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.05;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  .wrap{position:relative;z-index:2;max-width:var(--maxw);margin:0 auto;padding:0 28px}
+
+  a{color:inherit}
+  mono,.mono{font-family:"JetBrains Mono",monospace}
+  ::selection{background:var(--accent);color:#fff}
+
+  /* ---------- masthead ---------- */
+  header.mast{padding:54px 0 30px;border-bottom:2px solid var(--ink);position:relative}
+  .eyebrow{font-family:"JetBrains Mono",monospace;font-size:12.5px;letter-spacing:.34em;text-transform:uppercase;color:var(--accent-deep);display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .eyebrow .dot{width:7px;height:7px;background:var(--accent);border-radius:50%}
+  h1.title{font-family:"Fraunces",serif;font-weight:900;font-size:clamp(42px,7.5vw,92px);line-height:.92;letter-spacing:-.02em;margin:.18em 0 .12em;font-optical-sizing:auto}
+  h1.title em{font-style:italic;font-weight:500;color:var(--accent)}
+  .lede{font-size:clamp(18px,2.3vw,23px);max-width:64ch;color:var(--ink-soft)}
+  .lede strong{color:var(--ink);font-weight:600}
+  .meta-row{margin-top:26px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .chip{font-family:"JetBrains Mono",monospace;font-size:12px;letter-spacing:.04em;text-transform:uppercase;border:1.5px solid var(--ink);border-radius:100px;padding:6px 13px;background:transparent}
+  .chip.fill{background:var(--ink);color:var(--paper)}
+  .chip.acc{background:var(--accent);border-color:var(--accent);color:#fff}
+  .chip.go{background:var(--green);border-color:var(--green);color:#fff}
+  .stamp{position:absolute;top:46px;right:8px;font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--ink-faint);text-align:right;line-height:1.7;transform:rotate(-1.5deg)}
+
+  /* ---------- layout ---------- */
+  .grid{display:grid;grid-template-columns:212px 1fr;gap:48px;align-items:start;margin-top:46px}
+  nav.toc{position:sticky;top:24px;font-family:"JetBrains Mono",monospace;font-size:12.5px}
+  nav.toc .tlabel{letter-spacing:.24em;text-transform:uppercase;color:var(--ink-faint);font-size:11px;padding-bottom:10px;border-bottom:1px solid var(--rule);margin-bottom:12px}
+  nav.toc ol{list-style:none;counter-reset:t}
+  nav.toc li{counter-increment:t;margin:2px 0}
+  nav.toc a{display:flex;gap:10px;text-decoration:none;color:var(--ink-soft);padding:6px 8px;border-radius:7px;transition:.18s}
+  nav.toc a::before{content:counter(t,decimal-leading-zero);color:var(--accent);font-weight:700}
+  nav.toc a:hover{background:var(--paper-3);color:var(--ink);transform:translateX(3px)}
+
+  main{min-width:0}
+  section{margin-bottom:74px;scroll-margin-top:24px}
+  .sec-head{display:flex;align-items:baseline;gap:16px;border-bottom:1.5px solid var(--rule);padding-bottom:12px;margin-bottom:26px}
+  .sec-num{font-family:"JetBrains Mono",monospace;font-weight:700;color:var(--accent);font-size:15px;padding-top:4px}
+  h2{font-family:"Fraunces",serif;font-weight:600;font-size:clamp(28px,4vw,40px);line-height:1.04;letter-spacing:-.015em}
+  h3{font-family:"Fraunces",serif;font-weight:600;font-size:21px;margin:26px 0 8px}
+  p{margin:0 0 14px;max-width:74ch}
+  p .k,.k{font-family:"JetBrains Mono",monospace;font-size:.84em;background:var(--paper-3);border:1px solid var(--rule);border-radius:5px;padding:1px 6px}
+  strong{font-weight:600}
+  .pull{font-family:"Fraunces",serif;font-style:italic;font-weight:500;font-size:clamp(20px,2.6vw,27px);line-height:1.32;color:var(--ink);border-left:4px solid var(--accent);padding:4px 0 4px 20px;margin:22px 0;max-width:none}
+
+  /* ---------- scorecard ---------- */
+  .score{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:6px 0 22px}
+  .scard{border:1.5px solid var(--rule);border-radius:14px;padding:16px 18px 14px;background:linear-gradient(180deg,#fbf7ee,#f1e9d9);position:relative;overflow:hidden}
+  .scard .n{font-family:"Fraunces",serif;font-weight:900;font-size:46px;line-height:1;letter-spacing:-.02em}
+  .scard .l{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-top:6px}
+  .scard .sub{font-size:13px;color:var(--ink-faint);margin-top:4px;line-height:1.4}
+  .scard.keep{--b:var(--teal)} .scard.up{--b:var(--green)} .scard.down{--b:var(--gold)} .scard.lost{--b:var(--accent)} .scard.work{--b:var(--ink)}
+  .scard .n{color:var(--b,var(--ink))}
+  .scard .corner{position:absolute;top:-1px;right:-1px;width:28px;height:28px;background:var(--b,var(--accent));clip-path:polygon(100% 0,0 0,100% 100%)}
+
+  /* ---------- generic prose cards ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));gap:14px}
+  .card{background:linear-gradient(180deg,#fbf7ee,#f1e9d9);border:1.5px solid var(--rule);border-radius:14px;padding:18px;position:relative;overflow:hidden;transition:.2s}
+  .card:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:var(--accent)}
+  .card .ck{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent-deep)}
+  .card h4{font-family:"Fraunces",serif;font-weight:600;font-size:20px;margin:7px 0 5px;line-height:1.12}
+  .card p{font-size:15px;color:var(--ink-soft);margin:0}
+
+  /* ---------- impact pills ---------- */
+  .pill{font-family:"JetBrains Mono",monospace;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;border-radius:100px;padding:3px 10px;font-weight:700;color:#fff;white-space:nowrap;display:inline-block}
+  .pill.keep{background:var(--teal)}
+  .pill.up{background:var(--green)}
+  .pill.down{background:var(--gold)}
+  .pill.lost{background:var(--accent)}
+  .pill.mini{font-size:9.5px;padding:2px 8px}
+
+  /* ---------- feature ledger ---------- */
+  .feat{border:1.5px solid var(--rule);border-radius:14px;padding:16px 20px 15px 24px;margin-bottom:13px;background:linear-gradient(180deg,#fbf7ee,#f3ebda);position:relative;overflow:hidden;transition:.18s}
+  .feat:hover{box-shadow:var(--shadow);border-color:var(--c)}
+  .feat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--c,var(--ink-faint))}
+  .feat.keep{--c:var(--teal)} .feat.up{--c:var(--green)} .feat.down{--c:var(--gold)} .feat.lost{--c:var(--accent)}
+  .f-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .f-name{font-family:"Fraunces",serif;font-weight:600;font-size:19px;margin:0;flex:1;min-width:200px;line-height:1.16}
+  .f-loc{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--accent-deep);background:var(--paper-3);border:1px solid var(--rule);border-radius:6px;padding:2px 8px;display:inline-block;margin:10px 0 8px}
+  .f-body{font-size:15.5px;color:var(--ink-soft);margin:0;max-width:80ch}
+  .f-body em{color:var(--ink);font-style:italic}
+  .f-body code,.f-fix code,li code,p code{font-family:"JetBrains Mono",monospace;font-size:.82em;background:var(--paper-3);border:1px solid var(--rule);border-radius:5px;padding:1px 5px}
+
+  /* ---------- two-column compare ---------- */
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:8px 0 4px}
+  .vs .col{border:1.5px solid var(--rule);border-radius:16px;padding:20px 22px;background:linear-gradient(180deg,#fbf7ee,#f1e9d9);position:relative}
+  .vs .col.web{border-color:var(--green)}
+  .vs .col.desk{border-color:var(--teal)}
+  .vs .col h4{font-family:"Fraunces",serif;font-weight:600;font-size:22px;margin:4px 0 4px}
+  .vs .col .tag{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:700}
+  .vs .col.web .tag{color:var(--green-deep)}
+  .vs .col.desk .tag{color:var(--teal)}
+  .vs ul{margin:12px 0 0;padding-left:18px}
+  .vs li{margin:7px 0;font-size:15px;color:var(--ink-soft)}
+  .vs li b{color:var(--ink);font-weight:600}
+
+  /* ---------- change rows ---------- */
+  .chg{border:1.5px solid var(--rule);border-radius:14px;padding:16px 20px;margin-bottom:12px;background:linear-gradient(180deg,#fbf7ee,#f3ebda);position:relative;overflow:hidden}
+  .chg::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--cc,var(--blue))}
+  .chg.build{--cc:var(--blue)} .chg.code{--cc:var(--accent)} .chg.host{--cc:var(--green)} .chg.cfg{--cc:var(--gold)}
+  .chg .ctag{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:#fff;background:var(--cc,var(--blue));border-radius:5px;padding:2px 8px;margin-right:10px}
+  .chg .effort{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--ink-faint);float:right}
+  .chg h4{font-family:"Fraunces",serif;font-weight:600;font-size:18px;margin:0 0 6px;display:inline}
+  .chg p{font-size:15px;color:var(--ink-soft);margin:9px 0 0;max-width:none}
+
+  /* ---------- code block ---------- */
+  pre{font-family:"JetBrains Mono",monospace;font-size:13px;line-height:1.6;background:#fbf7ee;border:1.5px solid var(--rule);border-left:5px solid var(--blue);border-radius:12px;padding:16px 18px;overflow-x:auto;margin:12px 0;color:var(--ink)}
+  pre .c{color:var(--ink-faint)}
+  pre .a{color:var(--accent-deep)}
+
+  /* ---------- timeline ---------- */
+  .timeline{position:relative;margin-left:8px;padding-left:30px;border-left:2px solid var(--ink)}
+  .phase{position:relative;margin-bottom:28px}
+  .phase::before{content:"";position:absolute;left:-39px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--paper);border:3px solid var(--accent)}
+  .phase.opt::before{border-color:var(--gold)}
+  .phase.ship::before{background:var(--green);border-color:var(--green)}
+  .phase .ph{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent-deep);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .phase .ph .eff{color:var(--ink-faint);letter-spacing:.06em}
+  .phase h4{font-family:"Fraunces",serif;font-weight:600;font-size:23px;margin:3px 0 6px}
+  .phase ul{margin:0;padding-left:20px}
+  .phase li{margin:5px 0;font-size:15.5px;color:var(--ink-soft)}
+  .phase li b{color:var(--ink);font-weight:600}
+  .gate{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--teal);margin-top:8px;border-top:1px dashed var(--rule);padding-top:8px}
+  .gate b{color:var(--green-deep)}
+
+  /* ---------- callout ---------- */
+  .note{border:1.5px solid var(--gold);border-radius:16px;padding:20px 24px;background:linear-gradient(180deg,#f7f1e2,#f1e7cf);position:relative;overflow:hidden;margin:18px 0}
+  .note .tag{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:700}
+  .note h3{margin:6px 0 8px}
+  .note p{margin:0;color:var(--ink-soft);font-size:15.5px}
+  .note.good{border-color:var(--green)}
+  .note.good .tag{color:var(--green-deep)}
+  .note.bug{border-color:var(--accent)}
+  .note.bug .tag{color:var(--accent-deep)}
+
+  ul.clean{list-style:none;margin:10px 0}
+  ul.clean li{position:relative;padding-left:24px;margin:8px 0;font-size:15.5px;color:var(--ink-soft);max-width:80ch}
+  ul.clean li::before{content:"›";position:absolute;left:4px;color:var(--accent);font-weight:700;font-family:"JetBrains Mono",monospace}
+  ul.clean li b{color:var(--ink);font-weight:600}
+
+  footer{border-top:2px solid var(--ink);margin-top:30px;padding:34px 0 60px;font-family:"JetBrains Mono",monospace;font-size:12.5px;color:var(--ink-soft);display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px}
+
+  .reveal{opacity:0;transform:translateY(16px);animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  @media(max-width:880px){
+    .grid{grid-template-columns:1fr}
+    nav.toc{position:static;margin-bottom:10px}
+    nav.toc ol{columns:2;font-size:12px}
+    .vs{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="wrap">
+
+  <header class="mast">
+    <div class="stamp">DESIGN&nbsp;DOC<br/>web-deploy.html<br/>v0.2.0 · 2026-06-01</div>
+    <div class="eyebrow"><span class="dot"></span> NoteTaker · Phase 4 proposal · deployment</div>
+    <h1 class="title">Ship it to <em>the web</em>.</h1>
+    <p class="lede">A plan to publish NoteTaker as a hosted web app <strong>alongside</strong> the
+      desktop build — what it costs, what it wins, what breaks, and the exact steps to get there.
+      The headline: <strong>the frontend already runs in a browser today</strong>, so this is a
+      hosting-and-trade-offs decision, not a rewrite.</p>
+    <div class="meta-row">
+      <span class="chip fill">SPA · Vite static build</span>
+      <span class="chip">one codebase · two targets</span>
+      <span class="chip">shared Firebase backend</span>
+      <span class="chip go">recommended: do it</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <nav class="toc">
+      <div class="tlabel">Contents</div>
+      <ol>
+        <li><a href="#choice">The choice</a></li>
+        <li><a href="#whatis">Why it's cheap</a></li>
+        <li><a href="#app">Effect on the app</a></li>
+        <li><a href="#features">Feature-by-feature</a></li>
+        <li><a href="#storage">Storage &amp; durability</a></li>
+        <li><a href="#security">Security &amp; config</a></li>
+        <li><a href="#changes">Changes necessary</a></li>
+        <li><a href="#plan">Implementation plan</a></li>
+        <li><a href="#verdict">Verdict</a></li>
+      </ol>
+    </nav>
+
+    <main>
+
+      <!-- 01 -->
+      <section id="choice" class="reveal">
+        <div class="sec-head"><div class="sec-num">01</div><h2>The choice</h2></div>
+        <p>Publish the existing React/TypeScript frontend as a <strong>static single-page web app</strong>
+          served from a URL, so anyone can open NoteTaker in a browser tab with no install. The desktop
+          (Tauri) app does <em>not</em> go away — web becomes a <strong>second distribution of the same
+          codebase</strong>, pointed at the <strong>same Firebase backend</strong>. A user who signs in
+          gets the same map library whether they opened the installer or the link.</p>
+        <p class="pull">Web is the front door (try instantly, sync everywhere); desktop stays the power
+          tool (overlay, global hotkey, durable files, video download).</p>
+        <p>This is feasible at low cost because of how the app was built. NoteTaker is a Vite + React app
+          wrapped in a thin Rust shell. Every Tauri-only capability already sits behind a
+          <span class="k">src/platform/*</span> module that branches on a single runtime flag —
+          <span class="k">isTauri = "__TAURI_INTERNALS__" in window</span>
+          (<span class="k">src/platform/window.ts</span>) — and each one <em>already has a browser
+          fallback written</em>. Running <span class="k">npm run dev</span> / <span class="k">npm run build</span>
+          today produces a working browser app; that path has existed since Phase 1.</p>
+      </section>
+
+      <!-- 02 -->
+      <section id="whatis" class="reveal">
+        <div class="sec-head"><div class="sec-num">02</div><h2>Why it's cheap: the web build exists</h2></div>
+        <p>The scope of "deploy as a web app" is unusually small because we are not building a web app —
+          we are <strong>hosting one that already compiles</strong>. The work is (a) decide what to do
+          about the handful of features that degrade or vanish without a native shell, (b) move a few
+          pieces of config from Tauri to the web host, and (c) put the <span class="k">dist/</span> folder
+          on a static host.</p>
+
+        <div class="score">
+          <div class="scard work"><div class="corner"></div><div class="n">~10</div><div class="l">Work as-is</div><div class="sub">No change needed in the browser</div></div>
+          <div class="scard up"><div class="corner"></div><div class="n">3</div><div class="l">Improve on web</div><div class="sub">Sign-in, sync, distribution</div></div>
+          <div class="scard down"><div class="corner"></div><div class="n">4</div><div class="l">Degrade</div><div class="sub">Keys, local video, save</div></div>
+          <div class="scard lost"><div class="corner"></div><div class="n">3</div><div class="l">Lost on web</div><div class="sub">Need the native shell</div></div>
+        </div>
+
+        <p>The single most important consequence is the loss of the <strong>always-on-top frameless
+          overlay</strong> — the app's defining form factor. The subtlest cost is <strong>keyboard</strong>:
+          NoteTaker is keyboard-first, and several of its shortcuts collide with the browser's own — one,
+          <span class="k">Ctrl+T</span>, can't be reclaimed by a web page at all (§04). Everything else is
+          a graceful degradation or an outright win. The rest of this document is the careful accounting of
+          those four columns and the steps that follow from them.</p>
+      </section>
+
+      <!-- 03 -->
+      <section id="app" class="reveal">
+        <div class="sec-head"><div class="sec-num">03</div><h2>Effect on the app: two products, one code</h2></div>
+        <p>Shipping web reframes NoteTaker from "a desktop overlay" into "a note app with a desktop
+          overlay <em>and</em> a web edition." The two editions diverge on form factor and storage, and
+          converge on everything else through the shared Firebase account.</p>
+
+        <div class="vs">
+          <div class="col desk">
+            <div class="tag">Desktop · Tauri</div>
+            <h4>The overlay companion</h4>
+            <ul>
+              <li><b>Floats over any app</b> — always-on-top, frameless, snaps to a screen edge.</li>
+              <li><b>Global hotkey</b> <span class="k">Ctrl+Alt+N</span> shows/hides it from anywhere.</li>
+              <li><b>Durable local files</b> — one JSON per map under the app data dir.</li>
+              <li><b>Video download</b> — yt-dlp + ffmpeg rescue embed-blocked videos.</li>
+              <li>Distributed as a signed installer per OS.</li>
+            </ul>
+          </div>
+          <div class="col web">
+            <div class="tag">Web · static SPA</div>
+            <h4>The zero-install edition</h4>
+            <ul>
+              <li><b>Opens in a tab</b> — used side-by-side via OS window snapping or Picture-in-Picture.</li>
+              <li><b>In-app shortcuts only</b> while the tab is focused; no OS-global hotkey.</li>
+              <li><b>Sync-first storage</b> — localStorage/IndexedDB locally, Firestore when signed in.</li>
+              <li>Embed-blocked videos fall back to the session timer (no download path).</li>
+              <li>Distributed as a <b>URL</b> — instant try, shareable, always current.</li>
+            </ul>
+          </div>
+        </div>
+
+        <p style="margin-top:18px">Because both editions read the same <span class="k">MapStore</span>
+          interface and the same Firestore tree (<span class="k">users/&lt;uid&gt;/maps/&lt;id&gt;</span>),
+          a signed-in user's notes are <strong>continuous across the two</strong>: start on the desktop
+          overlay during a lecture, review on the web from a different machine. That continuity is the
+          strategic payoff of shipping web on the existing backend rather than as a separate thing.</p>
+
+        <div class="note good">
+          <div class="tag">Cross-cutting · desktop + web</div>
+          <h3>Both editions need a notes-only mode — make the video player hideable.</h3>
+          <p>Today the embedded player only disappears on its own for <em>external</em> sources
+            (<span class="k">PlayerPanel.tsx:44</span> returns null — the live-lecture / Zoom case), and the
+            <span class="k">focus</span> layout shrinks it to a floating mini-player rather than removing it
+            (<span class="k">platform/layout.ts</span>). Neither is an explicit, user-controlled "hide the
+            player." Both editions want one. On <b>desktop</b>, a live in-person or Zoom lecture needs notes
+            at full height with no video pane at all. On <b>web</b>, the common setup is a split screen with
+            the video playing on its own site in the other half — so the in-app player is pure redundancy.
+            The change is small and shared: a persisted player-visibility toggle (a new "notes-only" layout,
+            or a flag in <span class="k">uiPrefs</span> like <span class="k">playerHeight</span>) that hands
+            notes 100% of the canvas, <em>decoupled from source type</em>. On web it should be the
+            <strong>default layout</strong> — and it cleanly defuses the lost video-download and
+            video-persistence concerns below, since a split-screen user never leans on the in-app player.</p>
+        </div>
+
+        <div class="note good">
+          <div class="tag">Cross-cutting · desktop + web</div>
+          <h3>Give the live-lecture timer a real pause — and split pause from reset.</h3>
+          <p>In a live lecture there's no video, so notes are stamped against the <b>session timer</b> — a
+            pure wall-clock count (<span class="k">ExternalController.getCurrentTime() = (Date.now() −
+            start) / 1000</span>, <span class="k">PlayerController.ts:32</span>). It has <em>no pause
+            concept</em>, and the only control is the timer chip in the title bar, where a single click
+            <strong>resets</strong> it (<span class="k">TopBar.tsx</span> → <span class="k">resetSession</span>
+            re-anchors <span class="k">sessionStart</span> to now, <span class="k">store.ts:534</span>). Two
+            problems: a break, tangent, or stepping away keeps the clock running, so later stamps drift from
+            real lecture time; and one ambiguous click silently wipes the elapsed count. <strong>Change
+            (both editions):</strong> a clear <b>Pause / Resume</b> toggle <em>plus</em> a distinct
+            <b>Reset</b> button. This needs a genuine pause model — accumulate elapsed seconds and track a
+            "running-since" epoch instead of a single <span class="k">start</span>, and persist it on the map
+            (extend the current <span class="k">sessionStart</span>) so a pause survives reload and sync.
+            <span class="k">Ctrl+Space</span> — today a no-op for external sources — can then pause/resume the
+            timer in live-lecture mode. All of this lives in the shared store / controller layer, so desktop
+            and web get it together.</p>
+        </div>
+      </section>
+
+      <!-- 04 -->
+      <section id="features" class="reveal">
+        <div class="sec-head"><div class="sec-num">04</div><h2>Effect on the features</h2></div>
+        <p>Every shipped feature, sorted by what the browser does to it. Locations point at the code that
+          already decides the behaviour.</p>
+
+        <h3><span class="pill keep">Works as-is</span> &nbsp;no change in the browser</h3>
+        <div class="feat keep">
+          <div class="f-top"><p class="f-name">Outline capture &amp; structure</p><span class="pill keep mini">keep</span></div>
+          <div class="f-loc">src/components/Outline/* · src/state/store.ts</div>
+          <p class="f-body">Pure React + Zustand. Typing, <span class="k">Enter</span> for a sibling,
+            <span class="k">⌫</span>, arrow-key navigation, reorder, collapse and undo/redo all work in a
+            tab. <em>The modifier shortcuts and Tab-to-indent are a separate story</em> — they collide with
+            the browser and are pulled out as a degrade below.</p>
+        </div>
+        <div class="feat keep">
+          <div class="f-top"><p class="f-name">Map view, cross-links, fullscreen</p><span class="pill keep mini">keep</span></div>
+          <div class="f-loc">src/components/Map/MapView.tsx (React Flow + dagre, React.lazy)</div>
+          <p class="f-body">Renders and lays out identically; the lazy chunk just downloads over HTTP
+            instead of from disk. Drag-to-link and the in-canvas fullscreen toggle are DOM-only.</p>
+        </div>
+        <div class="feat keep">
+          <div class="f-top"><p class="f-name">YouTube embed + click-to-seek</p><span class="pill keep mini">keep</span></div>
+          <div class="f-loc">src/components/Player/YouTubePlayer.tsx · src/player/youtubeApi.ts</div>
+          <p class="f-body">It's an <span class="k">&lt;iframe&gt;</span> driving the YouTube IFrame API —
+            a web technology to begin with. Seeking from a timestamped note works unchanged (host CSP must
+            allow <span class="k">frame-src youtube.com</span>; see §06).</p>
+        </div>
+        <div class="feat keep">
+          <div class="f-top"><p class="f-name">Transcript import + live drawer</p><span class="pill keep mini">keep</span></div>
+          <div class="f-loc">src/transcript/import.ts (transient &lt;input type=file&gt; + File.text())</div>
+          <p class="f-body">Deliberately built to never need a filesystem path — it reads the file's text
+            in-memory. <em>Identical</em> in browser and desktop. Cues persist inside the map.</p>
+        </div>
+        <div class="feat keep">
+          <div class="f-top"><p class="f-name">Command / jump palettes, maps switcher, help, onboarding, themes</p><span class="pill keep mini">keep</span></div>
+          <div class="f-loc">src/components/Palette/* · Help/* · Onboarding/* · platform/theme.ts</div>
+          <p class="f-body">All presentation + state. Light/dark/system theming is CSS variables; the help
+            overlay and onboarding are plain React. No native dependency anywhere.</p>
+        </div>
+        <div class="feat keep">
+          <div class="f-top"><p class="f-name">Markdown / Obsidian export</p><span class="pill keep mini">keep</span></div>
+          <div class="f-loc">src/platform/exportFile.ts:22 (Blob download fallback)</div>
+          <p class="f-body">The browser branch triggers a normal file download via a Blob URL. Functionally
+            complete — the only difference from desktop is no native "Save As" dialog.</p>
+        </div>
+
+        <h3 style="margin-top:30px"><span class="pill up">Improves</span> &nbsp;the web is the better host</h3>
+        <div class="feat up">
+          <div class="f-top"><p class="f-name">Google sign-in</p><span class="pill up mini">simpler</span></div>
+          <div class="f-loc">src/auth/authStore.ts:180 — signInWithPopup</div>
+          <p class="f-body">The browser uses Firebase's first-class <span class="k">signInWithPopup</span>.
+            The whole desktop apparatus — a Rust system-browser <em>loopback OAuth + PKCE</em> flow
+            (<span class="k">src/auth/desktopSignIn.ts</span>, the <span class="k">desktop_google_sign_in</span>
+            Rust command, an embedded client secret) — <strong>is not needed on web</strong>. Web sign-in
+            is the easy path the desktop has to emulate.</p>
+        </div>
+        <div class="feat up">
+          <div class="f-top"><p class="f-name">Cloud sync becomes the safe default</p><span class="pill up mini">safer</span></div>
+          <div class="f-loc">src/storage/sync.ts (local-first mirror to Firestore)</div>
+          <p class="f-body">On desktop, local files are durable, so sync is a bonus. On web, browser
+            storage is evictable — so being signed in is the <em>recommended</em> mode, and the existing
+            sync engine already provides it. The feature gains importance rather than function.</p>
+        </div>
+        <div class="feat up">
+          <div class="f-top"><p class="f-name">Distribution &amp; onboarding</p><span class="pill up mini">new</span></div>
+          <div class="f-loc">n/a — a property of being a URL</div>
+          <p class="f-body">No download, no OS gatekeeper, no per-platform installer. A link that's always
+            the latest version, shareable, and try-before-you-install. This is the main growth argument
+            for shipping web at all.</p>
+        </div>
+
+        <h3 style="margin-top:30px"><span class="pill down">Degrades</span> &nbsp;usable, with caveats</h3>
+        <div class="feat down">
+          <div class="f-top"><p class="f-name">Keyboard shortcuts &amp; Tab-to-indent</p><span class="pill down mini">collides</span></div>
+          <div class="f-loc">src/keyboard/keymap.ts · useKeyboard.ts — 20+ bindings, most Ctrl-based</div>
+          <p class="f-body">The app is keyboard-first and the browser owns many of the same keys. Three tiers:
+            <br>· <em>Interceptable</em> — most combos (<span class="k">Ctrl+S</span> save-page,
+            <span class="k">Ctrl+P</span> print, <span class="k">Ctrl+O</span> open, <span class="k">Ctrl+K</span>
+            omnibox) and <span class="k">Tab</span>/<span class="k">⇧Tab</span> focus-traversal can be reclaimed
+            with <span class="k">preventDefault()</span> while focus is in the app — which it already does in
+            dev. Brittle (focus-dependent) but workable.
+            <br>· <em>Reserved, NOT interceptable</em> — a web page cannot stop <span class="k">Ctrl+T</span>
+            (new tab), <span class="k">Ctrl+N</span> (new window), or <span class="k">Ctrl+W</span> (close tab).
+            NoteTaker's <span class="k">Ctrl+T = insert / refresh timestamp</span> is a <em>primary</em> capture
+            action and a direct casualty: on web it would open a browser tab.
+            <br>· <em>Editing conflicts</em> — <span class="k">Ctrl+←/→</span> (rewind / forward video) clashes
+            with word-by-word cursor motion <em>inside</em> a note's text.
+            <br><strong>Fix:</strong> a web-specific keymap that rebinds the reserved combos (above all
+            Ctrl+T), plus the §08 PWA — an installed / fullscreen app can use the Keyboard Lock API
+            (<span class="k">navigator.keyboard.lock()</span>) to capture even Ctrl+T / Ctrl+W. Trapping
+            <span class="k">Tab</span> also needs an accessibility escape so keyboard users aren't stuck in
+            the outline.</p>
+        </div>
+        <div class="feat down">
+          <div class="f-top"><p class="f-name">Local video persistence</p><span class="pill down mini">re-pick</span></div>
+          <div class="f-loc">src/platform/dialog.ts:52 — object-URL fallback</div>
+          <p class="f-body">The video still <em>plays</em>: the browser opens it via
+            <span class="k">URL.createObjectURL</span>. But a web page can't know a file's real path, so it
+            <strong>cannot be reloaded across sessions</strong> — the user re-picks the file each time.
+            Desktop keeps the real <span class="k">filePath</span> and reloads through
+            <span class="k">asset://</span>. (Click-to-seek within a session is unaffected; and for the
+            split-screen / notes-only web user in §03 this rarely matters — they play the file in their own
+            player.)</p>
+        </div>
+        <div class="feat down">
+          <div class="f-top"><p class="f-name">Save / open dialogs</p><span class="pill down mini">browser-native</span></div>
+          <div class="f-loc">exportFile.ts · dialog.ts · transcript/import.ts</div>
+          <p class="f-body">Native OS dialogs become browser download + <span class="k">&lt;input type=file&gt;</span>.
+            No lost capability, just a less "native" feel and no chosen-path memory.</p>
+        </div>
+        <div class="feat down">
+          <div class="f-top"><p class="f-name">Flush-on-exit guarantee</p><span class="pill down mini">best-effort</span></div>
+          <div class="f-loc">src/platform/lifecycle.ts · fileStore.ts:210 (saveSync)</div>
+          <p class="f-body">Desktop holds the window close, awaits an async flush, then destroys it. Web
+            relies on <span class="k">visibilitychange</span>/<span class="k">beforeunload</span> +
+            a <em>synchronous</em> localStorage write (already implemented as <span class="k">saveSync</span>).
+            Solid in practice, but the browser gives weaker guarantees than the native close handler.</p>
+        </div>
+
+        <h3 style="margin-top:30px"><span class="pill lost">Lost</span> &nbsp;requires the native shell</h3>
+        <div class="feat lost">
+          <div class="f-top"><p class="f-name">Always-on-top overlay (frameless, snap-to-edge)</p><span class="pill lost mini">gone</span></div>
+          <div class="f-loc">src-tauri/src/lib.rs · platform/window.ts (all no-op in browser)</div>
+          <p class="f-body"><em>The defining form factor.</em> A web page cannot float above other
+            applications, remove its own chrome, or snap to a screen edge. On web you place the tab beside
+            the lecture via OS window-snapping, or pop the video out with Picture-in-Picture. The min /
+            maximize / close buttons in the title bar (<span class="k">TopBar.tsx:89</span>) become dead
+            controls and must be hidden on web.</p>
+        </div>
+        <div class="feat lost">
+          <div class="f-top"><p class="f-name">Global show/hide hotkey</p><span class="pill lost mini">gone</span></div>
+          <div class="f-loc">Ctrl+Alt+N — registered in Rust (tauri-plugin-global-shortcut)</div>
+          <p class="f-body">OS-level global shortcuts need a native process. In-app shortcuts still work
+            while the tab is focused; there's just no way to summon the tab from another app.</p>
+        </div>
+        <div class="feat lost">
+          <div class="f-top"><p class="f-name">High-quality YouTube download (yt-dlp + ffmpeg)</p><span class="pill lost mini">gone</span></div>
+          <div class="f-loc">src/platform/youtubeDownload.ts (returns null/false without a shell)</div>
+          <p class="f-body">Needs a native process to run a binary and write a cache. So an embed-blocked
+            video on web degrades to the session timer (no seek) instead of the download-and-play rescue.
+            Note this <em>cannot</em> be a pure client-side web feature regardless: a browser can't fetch
+            YouTube's video bytes cross-origin (CORS). Returning it to web would require a
+            <strong>server-side download service</strong> — explicitly out of scope (see §08). For the
+            split-screen / notes-only web user (§03) it rarely bites — they're watching on YouTube directly.</p>
+        </div>
+      </section>
+
+      <!-- 05 -->
+      <section id="storage" class="reveal">
+        <div class="sec-head"><div class="sec-num">05</div><h2>Storage &amp; durability — the real risk</h2></div>
+        <p>This deserves its own section because it's the one place where the "free" web build has a sharp
+          edge. The desktop writes durable JSON files. The browser's local-only mode writes
+          <strong>localStorage</strong> (<span class="k">notetaker:maps:v2</span>,
+          <span class="k">src/storage/fileStore.ts</span>), which is:</p>
+        <ul class="clean">
+          <li><b>Small</b> — a ~5&nbsp;MB per-origin budget. And transcripts persist <em>inside</em> the
+            map (<span class="k">NoteMap.transcript</span>), so an imported <span class="k">.srt</span> can
+            consume a large fraction of that budget per map.</li>
+          <li><b>Rewritten whole on every save</b> — <span class="k">writeAllWeb</span> serializes the
+            entire <span class="k">{id: NoteMap}</span> object each time
+            (<span class="k">fileStore.ts:67</span>), so cost grows with the <em>total</em> library, not
+            the edited map.</li>
+          <li><b>Evictable</b> — the browser or the user can clear it; there's no file on disk to recover
+            from.</li>
+        </ul>
+        <div class="note good">
+          <div class="tag">Recommendation</div>
+          <h3>Make signed-in the default on web, and upgrade local storage to IndexedDB.</h3>
+          <p>Add an <span class="k">idbStore</span> that implements the existing
+            <span class="k">MapStore</span> interface (<span class="k">list/load/save/remove</span>) — far
+            larger quota, per-map writes, no whole-library reserialization. It drops in behind the same
+            <span class="k">activeStore = isTauri ? … : webStore</span> switch with zero churn to callers.
+            Pair it with nudging web users toward sign-in (Firestore) so their library has a durable home
+            off-device. This is the one degradation worth actively engineering around.</p>
+        </div>
+      </section>
+
+      <!-- 06 -->
+      <section id="security" class="reveal">
+        <div class="sec-head"><div class="sec-num">06</div><h2>Security &amp; config deltas</h2></div>
+        <p>A few responsibilities move from the Tauri shell to the web host. None are hard; all are
+          easy to forget.</p>
+
+        <div class="cards">
+          <div class="card"><div class="ck">CSP moves to the host</div><h4>Content-Security-Policy</h4><p>The policy in <span class="k">tauri.conf.json</span> is enforced by Tauri and does <em>not</em> apply to a web host. Serve an equivalent via response headers (or a <span class="k">&lt;meta&gt;</span>), dropping the Tauri-only sources (<span class="k">asset:</span>, <span class="k">ipc:</span>, <span class="k">*.localhost</span>).</p></div>
+          <div class="card"><div class="ck">Firebase auth domains</div><h4>Authorize the prod origin</h4><p>Popup sign-in only works from an <b>Authorized domain</b>. <span class="k">localhost</span> is allowed by default; the deployed domain must be added in Firebase Console → Authentication → Settings.</p></div>
+          <div class="card"><div class="ck">Rules are the only guard</div><h4>Deploy firestore.rules</h4><p>On a public URL, the owner-only rules (already in <span class="k">firestore.rules</span>) are the sole thing protecting data. <span class="k">firebase deploy --only firestore:rules</span> is now a release gate, not optional.</p></div>
+          <div class="card"><div class="ck">No secret in the web bundle</div><h4>Desktop secret stays desktop</h4><p>The web build must build <em>without</em> <span class="k">VITE_GOOGLE_DESKTOP_CLIENT_SECRET</span> — and it does: that var is read only in <span class="k">desktopSignIn.ts</span>. Web needs just the four public <span class="k">VITE_FIREBASE_*</span> keys (meant to ship to clients).</p></div>
+          <div class="card"><div class="ck">Native write surface gone</div><h4>SEC-3 doesn't apply on web</h4><p>There's no Rust <span class="k">save_text_file</span> / asset-path command in the browser, so the desktop audit's arbitrary-file-write concern is structurally absent on the web target.</p></div>
+          <div class="card"><div class="ck">Base path</div><h4>Subpath vs root</h4><p>Root-domain or Netlify/Vercel/Firebase Hosting → default <span class="k">base:'/'</span> is fine. A GitHub Pages <em>project</em> page serves under <span class="k">/NoteTakerUI/</span> and needs <span class="k">base</span> set, or assets 404.</p></div>
+        </div>
+
+        <p style="margin-top:18px">A production CSP, derived from the existing one minus the Tauri-only
+          sources:</p>
+        <pre><span class="c">// served as a response header from the static host (or a &lt;meta&gt; tag)</span>
+default-src 'self';
+script-src  'self' https://www.youtube.com https://s.ytimg.com;
+style-src   'self' 'unsafe-inline' https://fonts.googleapis.com;
+font-src    'self' https://fonts.gstatic.com data:;
+img-src     'self' data: blob: https:;
+media-src   'self' blob:;
+connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com
+            https://www.googleapis.com https://firestore.googleapis.com
+            https://firebaseinstallations.googleapis.com;
+frame-src   https://www.youtube.com https://www.youtube-nocookie.com;
+object-src  'none'; base-uri 'self'</pre>
+        <p style="margin-top:6px;font-size:14.5px;color:var(--ink-faint)">Note: the production Vite bundle
+          loads external ES modules, so <span class="k">script-src 'self'</span> holds without
+          <span class="k">unsafe-inline/eval</span> (those are only in Tauri's <em>devCsp</em>).</p>
+      </section>
+
+      <!-- 07 -->
+      <section id="changes" class="reveal">
+        <div class="sec-head"><div class="sec-num">07</div><h2>Changes necessary</h2></div>
+        <p>Concrete edits, grouped by kind. The striking part: <strong>nothing here is a rewrite</strong>,
+          and the build step already exists.</p>
+
+        <div class="chg build">
+          <span class="ctag">build</span><h4>Confirm / set the base path &amp; build output</h4><span class="effort">~½ hr</span>
+          <p><span class="k">npm run build</span> already emits a deployable <span class="k">dist/</span>
+            (Vite, with Firebase code-split per <span class="k">vite.config.ts</span>). Only set
+            <span class="k">base</span> if hosting under a subpath. No new build pipeline.</p>
+        </div>
+        <div class="chg code">
+          <span class="ctag">code</span><h4>Hide native-only UI when <code>!isTauri</code></h4><span class="effort">~2 hr</span>
+          <p>Gate the window min/maximize/close controls (<span class="k">TopBar.tsx:89</span>) behind
+            <span class="k">isTauri</span> so they aren't dead buttons on web. Optionally add a one-time
+            "web mode" notice explaining there's no overlay / global hotkey here. Small, surgical.</p>
+        </div>
+        <div class="chg code">
+          <span class="ctag">code</span><h4>Web-specific keymap (reclaim the reserved combos)</h4><span class="effort">~½ day</span>
+          <p>Rebind the browser-reserved shortcuts — above all <span class="k">Ctrl+T</span> (timestamp) —
+            to web-safe keys, and audit <span class="k">preventDefault()</span> coverage for the
+            interceptable ones. Pairs with the §08 PWA, which unlocks the Keyboard Lock API for the rest.</p>
+        </div>
+        <div class="chg code">
+          <span class="ctag">code</span><h4>Notes-only mode / hideable player — both editions</h4><span class="effort">~½ day</span>
+          <p>A persisted player-visibility toggle (new layout or <span class="k">uiPrefs</span> flag) giving
+            notes the full canvas, decoupled from source type. Serves the desktop live-lecture case and is
+            the default layout on web (split-screen). Benefits desktop too, so it's shared, not web-only.</p>
+        </div>
+        <div class="chg code">
+          <span class="ctag">code</span><h4>Session timer: pause / resume + a separate reset — both editions</h4><span class="effort">~½ day</span>
+          <p>Give <span class="k">ExternalController</span> a real pause model (accumulated elapsed +
+            running-since, persisted on the map beyond <span class="k">sessionStart</span>) and split the
+            single reset-on-click chip into clear <b>Pause/Resume</b> and <b>Reset</b> controls; wire
+            <span class="k">Ctrl+Space</span> to pause/resume in live-lecture mode. Shared store/UI layer —
+            not web-specific — but the live-lecture web user feels it most.</p>
+        </div>
+        <div class="chg code">
+          <span class="ctag">code</span><h4>IndexedDB <code>MapStore</code> for web local mode</h4><span class="effort">~1 day</span>
+          <p>New <span class="k">idbStore</span> implementing the existing interface; swap it in for
+            <span class="k">webStore</span> behind the same runtime switch. Addresses the §05 durability
+            risk. Optional for a first ship, recommended before promoting web.</p>
+        </div>
+        <div class="chg host">
+          <span class="ctag">host</span><h4>Pick a static host + SPA rewrite</h4><span class="effort">~1 hr</span>
+          <p><b>Recommended: Firebase Hosting</b> — already in the stack, same project as Auth/Firestore,
+            one <span class="k">firebase deploy</span>, free TLS + custom domain, trivial SPA rewrite to
+            <span class="k">index.html</span>. Alternatives: Netlify / Vercel / Cloudflare Pages / GitHub
+            Pages (mind the base-path caveat).</p>
+        </div>
+        <div class="chg cfg">
+          <span class="ctag">config</span><h4>Backend + CSP wiring</h4><span class="effort">~1 hr</span>
+          <p>Add the prod domain to Firebase Authorized domains; <span class="k">firebase deploy --only
+            firestore:rules</span>; serve the §06 CSP header; provide the four
+            <span class="k">VITE_FIREBASE_*</span> values to the web build (CI secrets).</p>
+        </div>
+        <div class="chg build">
+          <span class="ctag">ci</span><h4>Web deploy workflow</h4><span class="effort">~2 hr</span>
+          <p>A GitHub Actions job parallel to the existing <span class="k">release.yml</span>: build the web
+            bundle and deploy to the host on push to <span class="k">main</span> (or a tag). Keeps the URL
+            always-current with no manual step.</p>
+        </div>
+
+        <div class="note good">
+          <div class="tag">Desktop bug · fixed</div>
+          <h3>The frameless window had a dead, non-draggable grey margin around the app — now it fills the window.</h3>
+          <p><b>Symptom (was):</b> the actual app (the cream card) was smaller than the window — a grey frame
+            wrapped it, the window looked larger than it is, and that grey strip couldn't be dragged.
+            <b>Cause:</b> <span class="k">.stage</span> is the full-window backdrop
+            (<span class="k">height:100vh; padding:18px</span> + the dotted <span class="k">--desk-dot</span>
+            background) and <span class="k">.app</span> filled it <em>minus</em> that 18px inset. The frameless
+            window's bounds are the whole <span class="k">.stage</span>, but only <span class="k">.bar-top</span>
+            carries <span class="k">data-tauri-drag-region</span> — so the 18px frame was part of the window
+            yet draggable nowhere and interactive nowhere.
+            <b>Fix shipped — <em>fill the window</em>:</b> <span class="k">main.tsx</span> now stamps
+            <span class="k">data-platform="desktop"</span> on the root element before first paint (gated on
+            <span class="k">isTauri</span>), and <span class="k">styles.css</span> zeroes the inset and strips the
+            card frame on that build —
+            <span class="k">[data-platform="desktop"] .stage{padding:0; background-image:none}</span> plus
+            <span class="k">[data-platform="desktop"] .app{border:none; border-radius:0; box-shadow:none}</span>.
+            The window now equals the card: no grey strip, nothing that "looks bigger than it is."
+            <b>Scope:</b> desktop-only — the browser build keeps its floating-card look untouched, since the
+            margin there is merely cosmetic.</p>
+        </div>
+      </section>
+
+      <!-- 08 -->
+      <section id="plan" class="reveal">
+        <div class="sec-head"><div class="sec-num">08</div><h2>Implementation plan</h2></div>
+        <p>Phased so there's a shippable, honest web app after Phase&nbsp;1, with durability and
+          app-likeness layered on after. Estimates are working days for one developer.</p>
+
+        <div class="timeline">
+          <div class="phase">
+            <div class="ph">Phase 0 — Prove it <span class="eff">· ~½ day · low risk</span></div>
+            <h4>Smoke-test the existing web build</h4>
+            <ul>
+              <li><span class="k">npm run build &amp;&amp; npm run preview</span>; open the bundle in a real browser.</li>
+              <li>Walk every feature: outline, map, YouTube seek, local video, transcript import, export, palettes, themes, undo, sign-in popup, sync.</li>
+              <li>Write down exactly what's dead (overlay, hotkey, download) and what's awkward (local-video re-pick). Confirms §04 against reality.</li>
+            </ul>
+            <div class="gate">Exit gate: <b>a verified list</b> of works / degrades / dead in your browser.</div>
+          </div>
+
+          <div class="phase">
+            <div class="ph">Phase 1 — Make it honest &amp; live <span class="eff">· ~1–2 days</span></div>
+            <h4>First real deployment to a staging URL</h4>
+            <ul>
+              <li>Gate native-only UI behind <span class="k">isTauri</span> (window controls; optional web-mode notice).</li>
+              <li>Ship a <b>web keymap</b> (rebind <span class="k">Ctrl+T</span> and the other reserved combos) and a <b>notes-only default layout</b> (hideable player) for the split-screen web case.</li>
+              <li>Add the <b>session-timer pause/resume + reset</b> controls (shared store change) so live-lecture stamps stay accurate through breaks.</li>
+              <li>Serve the §06 CSP; add the prod domain to Firebase Authorized domains; deploy <span class="k">firestore.rules</span>.</li>
+              <li>Deploy <span class="k">dist/</span> to <b>Firebase Hosting</b> with an SPA rewrite; verify sign-in + a Firestore round-trip from the hosted origin.</li>
+            </ul>
+            <div class="gate">Exit gate: <b>a working URL</b> where you can sign in and your maps load.</div>
+          </div>
+
+          <div class="phase">
+            <div class="ph">Phase 2 — Make it durable <span class="eff">· ~2–3 days</span></div>
+            <h4>Close the storage gap</h4>
+            <ul>
+              <li>Add the <span class="k">idbStore</span> (IndexedDB) implementing <span class="k">MapStore</span>; swap it in for web local mode.</li>
+              <li>Nudge web users toward sign-in; make signed-in the recommended default.</li>
+              <li>Verify sync round-trips <b>browser ↔ desktop on one account</b> — the cross-edition continuity promise.</li>
+            </ul>
+            <div class="gate">Exit gate: a map edited on web <b>appears on desktop</b> (and vice-versa), and local web data survives a reload comfortably.</div>
+          </div>
+
+          <div class="phase opt">
+            <div class="ph">Phase 3 — Make it app-like <span class="eff">· ~2–3 days · optional</span></div>
+            <h4>Recover some of the native feel</h4>
+            <ul>
+              <li><b>PWA</b>: web app manifest + service worker → installable, offline app shell, its own window.</li>
+              <li><b>Picture-in-Picture</b> for the video (<span class="k">requestPictureInPicture</span>) to partly recover a floating-player while notes stay in the tab.</li>
+              <li><b>Keyboard Lock API</b> (<span class="k">navigator.keyboard.lock()</span>) once installed / fullscreen — reclaims even the <span class="k">Ctrl+T</span> / <span class="k">Ctrl+W</span> a plain tab can't intercept, closing the §04 keyboard gap.</li>
+              <li>Responsive polish for narrow / tablet widths (the desktop assumes a wide window).</li>
+            </ul>
+            <div class="gate">Exit gate: NoteTaker is <b>installable</b> from the browser and usable offline for already-loaded maps.</div>
+          </div>
+
+          <div class="phase ship">
+            <div class="ph">Phase 4 — Ship <span class="eff">· ~½ day</span></div>
+            <h4>Custom domain + automation + docs</h4>
+            <ul>
+              <li>Point a custom domain at the host; CI deploy on push to <span class="k">main</span>/tag.</li>
+              <li>Update README with the live URL and a "web vs desktop" comparison; link it from the repo.</li>
+            </ul>
+            <div class="gate">Exit gate: <b>public URL</b>, auto-deployed, documented.</div>
+          </div>
+        </div>
+
+        <div class="note">
+          <div class="tag">Parked — out of scope</div>
+          <h3>Server-side YouTube download</h3>
+          <p>Returning the yt-dlp rescue to web is not a client change — a browser can't fetch YouTube
+            bytes cross-origin. It would mean standing up a <span class="k">yt-dlp</span> download service
+            (a backend, a job queue, storage, and the same ToS exposure the desktop feature carries). That
+            is a separate product decision; this plan deliberately leaves embed-blocked videos on the
+            timer fallback for web.</p>
+        </div>
+      </section>
+
+      <!-- 09 -->
+      <section id="verdict" class="reveal">
+        <div class="sec-head"><div class="sec-num">09</div><h2>Verdict</h2></div>
+        <p class="pull">Do it. The web build already compiles; the cost is hosting plus a careful handling
+          of three lost features, not an engineering project.</p>
+        <p>The leverage is high and the risk is low. Web becomes NoteTaker's front door — instant try, no
+          install, sync-first, shareable — while the desktop app keeps the things only a native shell can
+          do: the always-on-top overlay, the global hotkey, durable files, and the video download. One
+          codebase, one Firebase backend, two complementary editions of the same notes.</p>
+        <p>Recommended first move: <strong>Phases 0–1</strong> — prove the bundle in a browser, then put
+          it on a Firebase Hosting URL behind the existing auth. That alone delivers a real, honest web
+          app in two days. Layer IndexedDB durability (Phase 2) before promoting it widely, and treat the
+          PWA polish (Phase 3) as the optional finish.</p>
+      </section>
+
+      <footer>
+        <span>NoteTaker · web deployment plan · v0.2.0</span>
+        <span>2026-06-01 · one codebase, two targets</span>
+      </footer>
+
+    </main>
+  </div>
+</div>
+
+<script>
+  // Progressive reveal, matching the house design docs.
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) { e.target.style.animationDelay = (i * 40) + "ms"; e.target.classList.add("reveal"); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.08 });
+  document.querySelectorAll("section").forEach((s) => { s.classList.remove("reveal"); io.observe(s); });
+</script>
+</body>
+</html>
