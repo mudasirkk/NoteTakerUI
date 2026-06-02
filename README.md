@@ -6,7 +6,9 @@ NoteTaker is a small desktop app that floats above your video so you can take
 structured notes without ever leaving the keyboard. Every note is **stamped to the
 moment you wrote it** — click a timestamp later to jump the video right back there.
 Review your notes as a nested **outline** or as a **mind-map**, and (optionally) sign
-in with Google to keep the same library in sync across every device.
+in with Google to keep the same library in sync across every device. The same app runs
+two ways from one codebase — as an **always-on-top desktop overlay** and as an
+**installable web app** in the browser — with the same notes, shortcuts, and sync.
 
 [![CI](https://github.com/mudasirkk/NoteTakerUI/actions/workflows/ci.yml/badge.svg)](https://github.com/mudasirkk/NoteTakerUI/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -34,6 +36,9 @@ in with Google to keep the same library in sync across every device.
   system themes**, and a global show/hide hotkey (`Ctrl+Alt+N`).
 - **Offline-first** — everything is saved locally first; sync (when enabled) flushes
   in the background and reconciles on reconnect.
+- **Desktop or browser** — the same app installs as a native desktop overlay or runs
+  as an installable, offline-capable web app (PWA). Install the web app and even
+  `Ctrl+T` works just like the desktop.
 
 ---
 
@@ -49,6 +54,14 @@ in with Google to keep the same library in sync across every device.
 
 That's the whole setup — there's nothing to configure. Sign-in is optional, and you
 can switch from local to signed-in (or back) whenever you like.
+
+### Or use it in your browser
+
+NoteTaker also runs as a web app at **[your deployment URL]**. For the full
+keyboard experience, **install it** — click the install icon in your browser's address
+bar. An installed web app runs in its own window with no tab strip, so even browser
+combos like `Ctrl+T` reach NoteTaker. In a plain tab those few reserved combos fall
+back to `Alt`-based equivalents (the in-app `?` overlay always shows the live binding).
 
 > Releases are produced automatically from version tags, so this download lights up
 > once the first installer has been published.
@@ -87,8 +100,9 @@ Press `?` in the app for the live, always-current list.
 
 ## How your data is stored
 
-- **Local-only mode** — each map is a JSON file in the app's per-user data directory,
-  with an index sidecar. Nothing is sent anywhere.
+- **Local-only mode** — on the desktop each map is a JSON file in the app's per-user
+  data directory, with an index sidecar; the browser build keeps the same maps in
+  IndexedDB instead. Either way nothing is sent anywhere.
 - **Signed in** — your maps live in the cloud under your own account, guarded so only
   you can read or write them. The first time you sign in, any existing local maps are
   migrated into your account. Edits made offline are queued and reconciled on
@@ -101,13 +115,15 @@ Press `?` in the app for the live, always-current list.
 
 [Tauri 2](https://tauri.app) (Rust shell) · [React 18](https://react.dev) · TypeScript ·
 [Zustand](https://github.com/pmndrs/zustand) · [Vite](https://vitejs.dev) ·
-[Firebase](https://firebase.google.com) (Auth + Firestore) ·
+[Firebase](https://firebase.google.com) (Auth + Firestore + Hosting) ·
 [React Flow](https://reactflow.dev) for the map.
 
 ```
 src/            React app (outline, map, auth, state, keyboard)
 src-tauri/      Rust shell — window, OAuth loopback, file I/O, yt-dlp download
+public/         PWA manifest, service worker, and icons (web build)
 firestore.rules Owner-only Firestore security rules
+firebase.json   Firestore rules + Hosting config (SPA rewrite, CSP, cache headers)
 .env.example    Configuration template
 ```
 
@@ -172,6 +188,38 @@ cp .env.example .env.local
    client. Access to notes is controlled by `firestore.rules`, not by hiding these
    keys. Every signed-in user's data is isolated under `users/<their-uid>/maps/<id>`,
    so one Firebase project safely backs all of your users.
+
+### Deploy the web edition (Firebase Hosting)
+
+The same frontend ships as a hosted, installable web app. CI builds it and deploys to
+Firebase Hosting on every push to `main` ([`web-deploy.yml`](.github/workflows/web-deploy.yml));
+the hosting config — the SPA rewrite, the production Content-Security-Policy, and cache
+headers — lives in [`firebase.json`](firebase.json). To wire it to your own project:
+
+1. **Point the CLI at your project** — set your Firebase project id in `.firebaserc`
+   (replace the `REPLACE_WITH_FIREBASE_PROJECT_ID` placeholder).
+2. **Add the GitHub Actions secrets** (Settings → Secrets and variables → Actions):
+   - the six public `VITE_FIREBASE_*` web-config values, and
+   - `FIREBASE_SERVICE_ACCOUNT` — a service-account JSON key with the *Firebase Hosting
+     Admin* role.
+
+   The desktop-only `VITE_GOOGLE_DESKTOP_CLIENT_*` values are **not** used by the web
+   build and must never be added here — only the public web config is injected at build.
+3. **Authorize the production origin** so sign-in works there: Firebase console →
+   Authentication → Settings → **Authorized domains** → add your `*.web.app` (or custom)
+   domain.
+4. **Deploy the security rules** once (also a release gate before going live):
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+5. **Ship it** — push to `main` to let CI deploy, or deploy by hand:
+   ```bash
+   npm run build
+   firebase deploy --only hosting
+   ```
+
+The CSP in `firebase.json` already allows the YouTube iframe API and the Firebase
+auth-popup domains; if you add other third-party origins, widen it there.
 
 ### Desktop (Tauri) Google sign-in
 

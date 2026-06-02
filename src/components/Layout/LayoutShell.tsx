@@ -24,7 +24,12 @@ export function LayoutShell({ view, notes }: Props) {
   const splitRatio = useStore((s) => s.splitRatio);
   const setSplitRatio = useStore((s) => s.setSplitRatio);
   const sourceType = useStore((s) => s.map.source?.type ?? "external");
+  const playerVisible = useStore((s) => s.playerVisible);
   const hasVideo = sourceType === "youtube" || sourceType === "localVideo";
+  // The player pane shows only when there's a video source AND the user hasn't hidden
+  // it (notes-only mode). Everything below keys off showPlayer, so hiding the player
+  // collapses to the same full-bleed notes stage an external source already uses.
+  const showPlayer = hasVideo && playerVisible;
 
   const [narrow, setNarrow] = useState(() => window.innerWidth < NARROW);
   useEffect(() => {
@@ -76,14 +81,15 @@ export function LayoutShell({ view, notes }: Props) {
       id="view-panel"
       role="tabpanel"
       aria-labelledby={view === "outline" ? "tab-outline" : "tab-map"}
-      style={notesSized && hasVideo ? sizedStyle : undefined}
+      style={notesSized && showPlayer ? sizedStyle : undefined}
     >
       {notes}
     </section>
   );
 
-  // No media source: notes fill the stage — no divider, no video pane.
-  if (!hasVideo) {
+  // No player (external source, or the user hid it): notes fill the stage — no
+  // divider, no video pane.
+  if (!showPlayer) {
     return (
       <div className="mw-stage lay-solo" ref={stageRef}>
         {notesSection}

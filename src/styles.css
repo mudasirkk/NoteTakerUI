@@ -208,13 +208,22 @@ body {
 .title-input:hover { border-color: var(--line); }
 .title-input:focus { outline: none; border-color: var(--accent); background: var(--field-focus); }
 
+.timer-group { display: flex; align-items: center; gap: 6px; }
 .timer {
   font-family: "Spline Sans Mono", monospace; font-size: 12px; color: var(--accent-deep);
   background: rgba(52, 231, 196, 0.12); border: 1px solid rgba(52, 231, 196, 0.3);
-  border-radius: 6px; padding: 4px 9px; display: flex; gap: 6px; align-items: center; cursor: pointer;
+  border-radius: 6px; padding: 4px 9px; display: flex; gap: 6px; align-items: center;
 }
-.timer:hover { background: rgba(52, 231, 196, 0.18); }
 .timer .rec { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+/* Paused live-lecture timer: freeze the pulse and desaturate so a stopped clock reads at a glance. */
+.timer.paused { color: var(--ink-faint); background: rgba(127, 127, 127, 0.1); border-color: var(--line); }
+.timer.paused .rec { background: var(--ink-faint); animation: none; box-shadow: none; }
+.timer-btn {
+  font-family: "Spline Sans Mono", monospace; font-size: 11px; color: var(--ink-soft);
+  background: transparent; border: 1px solid var(--line); border-radius: 6px;
+  padding: 4px 8px; cursor: pointer; transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.timer-btn:hover { background: var(--hover); color: var(--ink); border-color: var(--accent); }
 @keyframes pulse {
   0% { box-shadow: 0 0 0 0 rgba(52, 231, 196, 0.5); }
   70% { box-shadow: 0 0 0 7px rgba(52, 231, 196, 0); }
@@ -349,7 +358,21 @@ body {
 .player-body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .yt-host { width: 100%; height: 100%; }
 .yt-host iframe { width: 100%; height: 100%; border: 0; display: block; }
+.lv-wrap { position: relative; width: 100%; height: 100%; }
 .lv-video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+/* Picture-in-picture toggle: a subtle overlay top-right (native controls sit at the
+   bottom), brightening on hover and going accent while PiP is active. */
+.lv-pip {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  display: grid; place-items: center; width: 28px; height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 7px;
+  background: rgba(8, 9, 12, 0.55); color: var(--player-ink); cursor: pointer;
+  opacity: 0.55; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  transition: opacity 0.15s, border-color 0.15s, color 0.15s, background 0.15s;
+}
+.lv-wrap:hover .lv-pip { opacity: 1; }
+.lv-pip:hover { color: #fff; border-color: var(--accent); background: rgba(8, 9, 12, 0.8); }
+.lv-pip.on { opacity: 1; color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
 .player-pick { margin: 26px auto; padding: 8px 16px; border: 1px dashed var(--ink-faint); background: transparent; color: var(--player-ink); border-radius: 8px; cursor: pointer; font-family: "Spline Sans Mono", monospace; font-size: 12px; }
 .player-pick:hover { border-color: var(--accent); color: #fff; }
 .player-warn { padding: 22px 16px; color: var(--player-ink); font-size: 12.5px; text-align: center; }
@@ -436,6 +459,10 @@ body {
 /* ---------- maps switcher ---------- */
 .maps-btn { font-family: "Spline Sans Mono", monospace; font-size: 11px; color: var(--ink-faint); background: transparent; border: 1px solid var(--line); border-radius: 7px; padding: 4px 9px; cursor: pointer; }
 .maps-btn:hover { color: var(--accent); border-color: rgba(52, 231, 196, 0.4); }
+/* Notes-only / show-player toggle: dim when the player is hidden, accented when shown. */
+.player-toggle { font-family: "Spline Sans Mono", monospace; font-size: 11px; color: var(--ink-faint); background: transparent; border: 1px solid var(--line); border-radius: 7px; padding: 4px 9px; cursor: pointer; }
+.player-toggle:hover { color: var(--accent); border-color: rgba(52, 231, 196, 0.4); }
+.player-toggle.on { color: var(--accent); border-color: rgba(52, 231, 196, 0.4); }
 .pal-new { font-family: "Spline Sans Mono", monospace; font-size: 11px; color: var(--accent); background: transparent; border: 1px solid rgba(52, 231, 196, 0.4); border-radius: 6px; padding: 3px 8px; cursor: pointer; flex: none; }
 .pal-new:hover { background: rgba(52, 231, 196, 0.1); }
 .palrow.current .paltxt { color: var(--accent-deep); font-weight: 600; }
@@ -801,3 +828,43 @@ body {
 .lay-opt .lay-ic { flex: none; width: 16px; text-align: center; font-size: 13px; }
 .lay-opt .lay-name { flex: 1; min-width: 0; }
 .lay-opt .lay-key { font-family: "Spline Sans Mono", monospace; font-size: 10px; color: var(--ink-faint); }
+
+/* ============================================================
+   RESPONSIVE — narrow windows & the web build on tablets/phones.
+   LayoutShell already collapses every docked split to the bottom dock below
+   720px (its NARROW constant); these rules keep the surrounding chrome — the
+   two top-bar rows, status bar and footer — usable as the window keeps
+   shrinking. Overflow fixes apply to BOTH editions (the frameless desktop
+   window has a 320px min and is often parked narrow beside a video); the
+   touch-oriented bits (dropping the floating-card frame, hiding the keyboard
+   hint strip) are scoped to the web build only.
+   ============================================================ */
+
+/* Tablet and below: the bottom control row can't fit on one line — let it wrap
+   and pack from the left instead of clipping under the card's overflow:hidden. */
+@media (max-width: 768px) {
+  .bar-bottom { flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
+}
+
+/* Phone-ish widths: tighten the chrome, and on the web build go full-bleed. */
+@media (max-width: 560px) {
+  .bar-top { padding: 8px 10px 4px; }
+  .bar-bottom { padding: 0 10px 8px; }
+  .statusbar { flex-wrap: wrap; padding: 5px 10px; gap: 8px; }
+  .hints { padding: 7px 10px; gap: 9px; }
+
+  /* The web build floats as a padded, rounded card; at phone widths that inset
+     and frame only waste space, so fill the viewport like the desktop shell
+     already does. (Desktop's higher-specificity padding:0 rules are unaffected.) */
+  [data-platform="web"] .stage { padding: 0; background-image: none; }
+  [data-platform="web"] .app { border: none; border-radius: 0; box-shadow: none; }
+
+  /* No window controls on web, so the title can take the full first row and the
+     timer + pause/reset wrap underneath rather than crowding the title to nothing. */
+  [data-platform="web"] .bar-top { flex-wrap: wrap; }
+  [data-platform="web"] .title-input { flex-basis: 100%; }
+
+  /* A phone-width web build is touch-only: drop the keyboard hint strip but keep
+     the "?" button, which opens the full shortcuts overlay. */
+  [data-platform="web"] .hints > span { display: none; }
+}

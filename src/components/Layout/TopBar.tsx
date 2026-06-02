@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../../state/store";
 import { formatTime } from "../../util/time";
-import { winClose, winMinimize, winToggleMaximize, winIsMaximized } from "../../platform/window";
+import {
+  winClose,
+  winMinimize,
+  winToggleMaximize,
+  winIsMaximized,
+  isTauri,
+} from "../../platform/window";
 import { AccountButton } from "../Auth/AccountButton";
 import { LAYOUTS, LAYOUT_META } from "../../platform/layout";
 
@@ -35,8 +41,23 @@ export function TopBar() {
   const autoStamp = useStore((s) => s.autoStamp);
   const theme = useStore((s) => s.theme);
   const layout = useStore((s) => s.layout);
-  const { setTitle, setView, toggleAutoStamp, resetSession, elapsed, setMaps, cycleTheme, setLayout } =
-    useStore.getState();
+  // Pause/Resume + Reset only make sense for the live-lecture (external) timer; a
+  // media source's chip just mirrors playback position.
+  const isExternal = useStore((s) => (s.map.source?.type ?? "external") === "external");
+  const sessionPaused = useStore((s) => s.sessionPaused);
+  const playerVisible = useStore((s) => s.playerVisible);
+  const {
+    setTitle,
+    setView,
+    toggleAutoStamp,
+    resetSession,
+    pauseSession,
+    togglePlayer,
+    elapsed,
+    setMaps,
+    cycleTheme,
+    setLayout,
+  } = useStore.getState();
 
   // Layout switcher popover (one of the three switch entry points). Closes on an
   // outside click or Escape; picking a layout applies it and closes.
@@ -82,26 +103,51 @@ export function TopBar() {
           onChange={(e) => setTitle(e.target.value)}
           aria-label="Lecture title"
         />
-        <button className="timer" onClick={resetSession} title="Click to reset the session timer">
-          <span className="rec" />
-          {formatTime(elapsed())}
-        </button>
-        <div className="winctl">
-          <button className="wbtn" title="Minimize" aria-label="Minimize" onClick={winMinimize}>
-            <IconMin />
-          </button>
-          <button
-            className="wbtn"
-            title={maximized ? "Restore" : "Maximize"}
-            aria-label={maximized ? "Restore" : "Maximize"}
-            onClick={toggleMax}
+        <div className="timer-group">
+          <span
+            className={"timer" + (isExternal && sessionPaused ? " paused" : "")}
+            title={isExternal ? "Session elapsed time" : "Playback position"}
           >
-            {maximized ? <IconRestore /> : <IconMax />}
-          </button>
-          <button className="wbtn close" title="Close" aria-label="Close" onClick={winClose}>
-            <IconClose />
-          </button>
+            <span className="rec" />
+            {formatTime(elapsed())}
+          </span>
+          {isExternal && (
+            <>
+              <button
+                className="timer-btn"
+                onClick={pauseSession}
+                title={sessionPaused ? "Resume the timer (Ctrl+Space)" : "Pause the timer (Ctrl+Space)"}
+              >
+                {sessionPaused ? "▶ Resume" : "❚❚ Pause"}
+              </button>
+              <button
+                className="timer-btn"
+                onClick={resetSession}
+                title="Reset the session timer to 0:00"
+              >
+                ↺ Reset
+              </button>
+            </>
+          )}
         </div>
+        {isTauri && (
+          <div className="winctl">
+            <button className="wbtn" title="Minimize" aria-label="Minimize" onClick={winMinimize}>
+              <IconMin />
+            </button>
+            <button
+              className="wbtn"
+              title={maximized ? "Restore" : "Maximize"}
+              aria-label={maximized ? "Restore" : "Maximize"}
+              onClick={toggleMax}
+            >
+              {maximized ? <IconRestore /> : <IconMax />}
+            </button>
+            <button className="wbtn close" title="Close" aria-label="Close" onClick={winClose}>
+              <IconClose />
+            </button>
+          </div>
+        )}
       </div>
       <div className="bar-bottom">
         <div
@@ -155,6 +201,16 @@ export function TopBar() {
         >
           ▤ maps
         </button>
+        {!isExternal && (
+          <button
+            className={"player-toggle" + (playerVisible ? " on" : "")}
+            onClick={togglePlayer}
+            title={playerVisible ? "Hide the player — notes only" : "Show the player"}
+            aria-pressed={playerVisible}
+          >
+            {playerVisible ? "▣ player" : "▢ player"}
+          </button>
+        )}
         <div className="lay-wrap" ref={layoutRef}>
           <button
             className="lay-btn"

@@ -161,7 +161,14 @@ interface State {
   // Both persist through uiPrefs (never per-map, never synced).
   layout: Layout;
   splitRatio: number;
+  // Device-local toggle to hide the media player and work notes-only even when a
+  // video source is set (persisted via uiPrefs, never synced). External sources are
+  // always notes-only regardless.
+  playerVisible: boolean;
   zoomRootId: string | null;
+  // Live-lecture session timer paused flag, mirrored from the ExternalController so
+  // the Pause/Resume UI re-renders. The source of truth persists on the map.
+  sessionPaused: boolean;
   controller: PlayerController;
   rate: number;
   localVideoUrl: string | null; // loadable URL (asset:// under Tauri, blob: in browser)
@@ -207,7 +214,9 @@ interface State {
   setLayout: (layout: Layout) => void;
   cycleLayout: (dir: 1 | -1) => void;
   setSplitRatio: (ratio: number, persist?: boolean) => void;
+  togglePlayer: () => void;
   resetSession: () => void;
+  pauseSession: () => void;
   undo: () => void;
   redo: () => void;
   save: () => void;
@@ -281,13 +290,40 @@ export const useStore = create<State>((set, get) => {
     if (cached && get().map.id === map.id) set({ ytLocalUrl: cached, ytStatus: "ready" });
   };
 
+  // Translate a map's persisted session-timer fields into the live controller. A
+  // paused map restores frozen (runningSince null); a running map anchors to its
+  // sessionStart so elapsed keeps counting across reload. Back-compat: a pre-pause
+  // map has no accrued/paused, so it restores running from sessionStart, accrued 0.
+  const applySession = (m: NoteMap) => {
+    const paused = m.sessionPaused ?? false;
+    sessionTimer.restore(
+      Math.max(0, m.sessionAccrued ?? 0),
+      paused ? null : m.sessionStart ?? Date.now()
+    );
+    set({ sessionPaused: paused });
+  };
+
+  // Snapshot the live timer back onto the map and persist it, so a Pause/Resume or
+  // Reset survives reload + cloud sync. Mirrors paused into state for the UI.
+  const persistSession = () => {
+    const snap = sessionTimer.snapshot();
+    const map = touch({
+      ...get().map,
+      sessionStart: snap.runningSince,
+      sessionAccrued: snap.accrued,
+      sessionPaused: snap.paused,
+    });
+    set({ map, sessionPaused: snap.paused });
+    scheduleSave(map);
+  };
+
   // Make a freshly-loaded map the live one: reset the session timer, rebuild the
   // local-video URL from its persisted path, and drop back to the session-timer
   // controller (embedded players re-register themselves when they remount).
   const applyLoaded = async (loaded: NoteMap) => {
     clearHistory(); // history is per-map; don't let Ctrl+Z reach the previous map
     revokeIfBlob(get().localVideoUrl);
-    sessionTimer.setStart(loaded.sessionStart ?? Date.now());
+    applySession(loaded);
     let localVideoUrl: string | null = null;
     if (loaded.source?.type === "localVideo" && loaded.source.filePath) {
       localVideoUrl = await resolveVideoUrl(loaded.source.filePath);
@@ -324,7 +360,9 @@ export const useStore = create<State>((set, get) => {
     theme: loadTheme(),
     layout: loadPref<Layout>("layout", DEFAULT_LAYOUT),
     splitRatio: loadPref<number>("splitRatio", DEFAULT_SPLIT_RATIO),
+    playerVisible: loadPref<boolean>("playerVisible", true),
     zoomRootId: null,
+    sessionPaused: false,
     controller: sessionTimer,
     rate: 1,
     localVideoUrl: null,
@@ -341,7 +379,7 @@ export const useStore = create<State>((set, get) => {
       if (metas.length === 0) {
         // First run: persist the fresh map created in the initial state.
         const m = get().map;
-        sessionTimer.setStart(m.sessionStart ?? Date.now());
+        applySession(m);
         setActiveMapId(m.id);
         set({ selectedId: m.nodes[0]?.id ?? null });
         void activeStore.save(m);
@@ -356,7 +394,7 @@ export const useStore = create<State>((set, get) => {
         await applyLoaded(loaded);
       } else {
         const m = get().map;
-        sessionTimer.setStart(m.sessionStart ?? Date.now());
+        applySession(m);
         setActiveMapId(m.id);
         set({ selectedId: m.nodes[0]?.id ?? null });
         void activeStore.save(m);
@@ -369,7 +407,7 @@ export const useStore = create<State>((set, get) => {
       clearHistory(); // fresh map starts with no undo history
       setActiveMapId(m.id);
       revokeIfBlob(get().localVideoUrl);
-      sessionTimer.setStart(m.sessionStart ?? Date.now());
+      applySession(m);
       set({
         map: m,
         selectedId: m.nodes[0]?.id ?? null,
@@ -531,12 +569,24 @@ export const useStore = create<State>((set, get) => {
       if (persist) savePref("splitRatio", splitRatio);
       set({ splitRatio });
     },
+    // Hide/show the media player to get a notes-only canvas even with a video source
+    // (device-local, persisted). No effect for external sources — always notes-only.
+    togglePlayer: () => {
+      const next = !get().playerVisible;
+      savePref("playerVisible", next);
+      set({ playerVisible: next });
+    },
     resetSession: () => {
-      const now = Date.now();
-      sessionTimer.setStart(now);
-      const map = touch({ ...get().map, sessionStart: now });
-      set({ map });
-      scheduleSave(map);
+      sessionTimer.reset();
+      persistSession();
+    },
+    // Pause/Resume the live-lecture timer (Ctrl+Space in external mode). The genuine
+    // pause model banks elapsed seconds and stops the clock, so a break no longer
+    // inflates later timestamps; persistSession writes it through for reload + sync.
+    pauseSession: () => {
+      if (sessionTimer.paused) sessionTimer.resume();
+      else sessionTimer.pause();
+      persistSession();
     },
     undo: () => {
       const snap = undoStack.pop();
@@ -771,7 +821,12 @@ configureSync({
   // the note content is reconciled — and preserve the selection when it survives.
   applyRemoteToActive: (incoming) => {
     const s = useStore.getState();
-    const map: NoteMap = { ...incoming, sessionStart: s.map.sessionStart };
+    const map: NoteMap = {
+      ...incoming,
+      sessionStart: s.map.sessionStart,
+      sessionAccrued: s.map.sessionAccrued,
+      sessionPaused: s.map.sessionPaused,
+    };
     const keep = s.selectedId !== null && map.nodes.some((n) => n.id === s.selectedId);
     const selectedId = keep ? s.selectedId : ops.visibleRows(map.nodes)[0]?.node.id ?? null;
     useStore.setState({ map, selectedId });

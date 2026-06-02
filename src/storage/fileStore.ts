@@ -8,6 +8,7 @@
 import type { NoteMap } from "../model/types";
 import { normalizeMap } from "../model/normalize";
 import { isTauri } from "../platform/window";
+import { idbStore, writePendingWeb } from "./idbStore";
 
 export interface MapMeta {
   id: string;
@@ -23,8 +24,6 @@ export interface MapStore {
   remove(id: string): Promise<void>;
 }
 
-const MAPS_KEY = "notetaker:maps:v2"; // browser: { [id]: NoteMap }
-const LEGACY_KEY = "notetaker:map:v1"; // browser: the old single-map key
 const ACTIVE_KEY = "notetaker:activeMapId";
 
 export function getActiveMapId(): string | null {
@@ -43,38 +42,15 @@ export function setActiveMapId(id: string): void {
   }
 }
 
-// Most-recently-updated first, so callers can default to metas[0].
-function metasOf(maps: NoteMap[]): MapMeta[] {
-  return maps
-    .map((m) => ({ id: m.id, title: m.title, updatedAt: m.updatedAt, rev: m.rev ?? 0 }))
-    .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
-}
-
 async function coreInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<T>(cmd, args);
 }
 
-function readAllWeb(): Record<string, NoteMap> {
-  try {
-    const raw = localStorage.getItem(MAPS_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, NoteMap>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeAllWeb(all: Record<string, NoteMap>): void {
-  try {
-    localStorage.setItem(MAPS_KEY, JSON.stringify(all));
-  } catch {
-    /* ignore quota / private-mode errors */
-  }
-}
-
-// Fold any pre-existing single-map storage into the new multi-map scheme. Runs
+// Fold the desktop's pre-existing single-map file into the multi-map scheme. Runs
 // at most once per session and is idempotent (the legacy record is removed once
-// imported), so later calls are no-ops.
+// imported), so later calls are no-ops. The browser's legacy-localStorage import
+// lives in idbStore now.
 let migration: Promise<void> | null = null;
 function ensureMigrated(): Promise<void> {
   if (!migration) migration = doMigrate();
@@ -82,63 +58,20 @@ function ensureMigrated(): Promise<void> {
 }
 
 async function doMigrate(): Promise<void> {
-  if (isTauri) {
-    try {
-      const legacy = await coreInvoke<string | null>("load_legacy_map");
-      if (legacy) {
-        const map = normalizeMap(JSON.parse(legacy));
-        if (map) {
-          await coreInvoke("save_map", { id: map.id, contents: JSON.stringify(map, null, 2) });
-          await coreInvoke("delete_legacy_map");
-        }
+  if (!isTauri) return; // the browser's legacy-localStorage import lives in idbStore
+  try {
+    const legacy = await coreInvoke<string | null>("load_legacy_map");
+    if (legacy) {
+      const map = normalizeMap(JSON.parse(legacy));
+      if (map) {
+        await coreInvoke("save_map", { id: map.id, contents: JSON.stringify(map, null, 2) });
+        await coreInvoke("delete_legacy_map");
       }
-    } catch (e) {
-      console.warn("legacy map migration failed", e);
     }
-  } else {
-    try {
-      const old = localStorage.getItem(LEGACY_KEY);
-      if (old) {
-        const map = normalizeMap(JSON.parse(old));
-        if (map) {
-          const all = readAllWeb();
-          all[map.id] = map;
-          writeAllWeb(all);
-        }
-        localStorage.removeItem(LEGACY_KEY);
-      }
-    } catch (e) {
-      console.warn("legacy map migration failed", e);
-    }
+  } catch (e) {
+    console.warn("legacy map migration failed", e);
   }
 }
-
-export const webStore: MapStore = {
-  async list() {
-    await ensureMigrated();
-    const maps = Object.values(readAllWeb())
-      .map(normalizeMap)
-      .filter((m): m is NoteMap => m !== null);
-    return metasOf(maps);
-  },
-  async load(id) {
-    await ensureMigrated();
-    const raw = readAllWeb()[id];
-    return raw ? normalizeMap(raw) : null;
-  },
-  async save(map) {
-    await ensureMigrated();
-    const all = readAllWeb();
-    all[map.id] = map;
-    writeAllWeb(all);
-  },
-  async remove(id) {
-    await ensureMigrated();
-    const all = readAllWeb();
-    delete all[id];
-    writeAllWeb(all);
-  },
-};
 
 export const tauriStore: MapStore = {
   async list() {
@@ -164,7 +97,7 @@ export const tauriStore: MapStore = {
           /* skip a corrupt index entry rather than failing the whole list */
         }
       }
-      // Most-recently-updated first, matching metasOf's ordering.
+      // Most-recently-updated first.
       return metas.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
     } catch (e) {
       console.warn("list_maps failed", e);
@@ -199,24 +132,20 @@ export const tauriStore: MapStore = {
   },
 };
 
-// On the desktop write real files; in the browser fall back to localStorage.
-export const activeStore: MapStore = isTauri ? tauriStore : webStore;
+// On the desktop write real files; in the browser persist to IndexedDB.
+export const activeStore: MapStore = isTauri ? tauriStore : idbStore;
 
 // Best-effort *synchronous* save for the unload/hide path. During `beforeunload`
 // or a window hide, queued microtasks (and therefore an async save) may never run
-// before the page is torn down, so the browser writes localStorage directly here.
-// The desktop has no synchronous IPC, so it fires the normal async save — the
-// Tauri close-requested handler awaits the async flush instead (see lifecycle.ts).
+// before the page is torn down. IndexedDB can't complete a write that late either,
+// so the browser mirrors the map into a synchronous localStorage pending key that
+// idbStore folds back into IndexedDB on the next load. The desktop has no
+// synchronous IPC, so it fires the normal async save — the Tauri close-requested
+// handler awaits the async flush instead (see lifecycle.ts).
 export function saveSync(map: NoteMap): void {
   if (isTauri) {
     void tauriStore.save(map);
   } else {
-    try {
-      const all = readAllWeb();
-      all[map.id] = map;
-      writeAllWeb(all);
-    } catch {
-      /* ignore quota / private-mode errors */
-    }
+    writePendingWeb(map);
   }
 }

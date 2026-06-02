@@ -130,6 +130,8 @@ export function normalizeMap(raw: unknown): NoteMap | null {
     updatedAt: str(raw.updatedAt, now),
     rev: Math.max(0, Math.floor(num(raw.rev, 0))),
     sessionStart: numOrNull(raw.sessionStart),
+    sessionAccrued: Math.max(0, num(raw.sessionAccrued, 0)),
+    sessionPaused: bool(raw.sessionPaused, false),
     nodes,
     links,
     transcript,

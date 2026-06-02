@@ -3,6 +3,7 @@ import { useStore } from "../../state/store";
 import { useFocusTrap } from "../../keyboard/useFocusTrap";
 import { importTranscriptFile } from "../../transcript/import";
 import { LAYOUTS, LAYOUT_META } from "../../platform/layout";
+import { STAMP_COMBO } from "../../keyboard/keymap";
 
 type Cmd = {
   id: string;
@@ -28,6 +29,8 @@ export function CommandPalette() {
   const transcriptOpen = useStore((s) => s.transcriptOpen);
   const hasTranscript = useStore((s) => (s.map.transcript?.length ?? 0) > 0);
   const pinned = useStore((s) => s.pinned);
+  const sourceType = useStore((s) => s.map.source?.type ?? "external");
+  const playerVisible = useStore((s) => s.playerVisible);
 
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
@@ -65,8 +68,17 @@ export function CommandPalette() {
         title: "Use external source (session timer)",
         run: () => st.setSource({ type: "external", label: "Lecture" }),
       },
+      ...(sourceType === "youtube" || sourceType === "localVideo"
+        ? [
+            {
+              id: "player-toggle",
+              title: playerVisible ? "Hide player — notes only" : "Show player",
+              run: () => st.togglePlayer(),
+            } as Cmd,
+          ]
+        : []),
       { id: "autostamp", title: `Auto-stamp: turn ${autoStamp ? "off" : "on"}`, run: () => st.toggleAutoStamp() },
-      { id: "stamp", title: "Stamp current note now", hint: "Ctrl+T", run: withSel((id) => st.stamp(id)) },
+      { id: "stamp", title: "Stamp current note now", hint: STAMP_COMBO, run: withSel((id) => st.stamp(id)) },
       {
         id: "delete-subtree",
         title: "Delete note & children",
@@ -134,7 +146,7 @@ export function CommandPalette() {
       { id: "save", title: "Save now", hint: "Ctrl+S", run: () => st.save() },
       { id: "export-md", title: "Export to Markdown…", run: () => void st.exportMarkdown() },
     ];
-  }, [view, autoStamp, zoomRootId, selectedId, transcriptOpen, hasTranscript, pinned]);
+  }, [view, autoStamp, zoomRootId, selectedId, transcriptOpen, hasTranscript, pinned, sourceType, playerVisible]);
 
   const results = useMemo(() => {
     const ql = q.trim().toLowerCase();

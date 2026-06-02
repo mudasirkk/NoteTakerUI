@@ -51,7 +51,16 @@ export interface NoteMap {
   // clock can't make an older edit win (FUN-2). Optional for back-compat: maps
   // written before this field default to 0 on load.
   rev?: number;
-  sessionStart: number | null; // epoch ms when the session timer started
+  // Session-timer state for external (live-lecture) sources. `sessionStart` is the
+  // epoch ms when the *current running segment* began, or null while paused / no
+  // session. `sessionAccrued` banks the seconds from segments before the current
+  // one, so a Pause/Resume cycle survives reload + sync. Both optional for
+  // back-compat: a map written before pause existed has a plain `sessionStart` and
+  // no accrued/paused fields, which restores to the old "running since start"
+  // behaviour exactly (accrued 0, not paused).
+  sessionStart: number | null;
+  sessionAccrued?: number; // seconds banked from completed running segments
+  sessionPaused?: boolean; // true while the live-lecture timer is paused
   nodes: NoteNode[];
   links?: NoteLink[]; // optional so older persisted maps still parse
   transcript?: TranscriptCue[]; // optional imported captions, aligned to media time

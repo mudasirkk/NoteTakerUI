@@ -1,0 +1,53 @@
+# Builds the web bundle and deploys it to Firebase Hosting on every push to main.
+# Handoff: this only runs once the repository has these Actions secrets set —
+#   VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID,
+#   VITE_FIREBASE_APP_ID, VITE_FIREBASE_MESSAGING_SENDER_ID,
+#   VITE_FIREBASE_STORAGE_BUCKET  (the public web config — safe to ship to clients)
+#   FIREBASE_SERVICE_ACCOUNT      (a Hosting-deploy service-account JSON key)
+# The desktop-only VITE_GOOGLE_DESKTOP_CLIENT_ID/SECRET are deliberately NOT passed
+# here — they belong to the Tauri loopback-OAuth flow and must never enter the web build.
+name: Deploy web (Firebase Hosting)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One production deploy at a time; a newer push supersedes an in-flight one.
+concurrency:
+  group: web-deploy-live
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build & deploy to Firebase Hosting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web bundle
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+        run: npm run build
+
+      - name: Deploy to Firebase Hosting (live channel)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: live
+          projectId: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}

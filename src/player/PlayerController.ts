@@ -15,22 +15,60 @@ export interface PlayerController {
   setRate(rate: number): void;
 }
 
-/** External source (Zoom, another app, etc.): a wall-clock session timer. */
+/**
+ * External source (Zoom, in-person lecture, etc.): a wall-clock session timer with
+ * a real pause model. `accrued` banks the seconds from completed running segments;
+ * `runningSince` is the epoch ms the current segment began, or null while paused.
+ * Elapsed = accrued + (running ? now − runningSince : 0). The model is persisted on
+ * the map (sessionAccrued / sessionStart / sessionPaused) so a pause survives reload
+ * and sync — a break no longer keeps the clock running and drifting later stamps.
+ */
 export class ExternalController implements PlayerController {
   readonly type: SourceType = "external";
   readonly canSeek = false;
-  private start: number;
+  private accrued = 0;
+  private runningSince: number | null;
 
   constructor(startEpochMs: number) {
-    this.start = startEpochMs;
+    this.runningSince = startEpochMs;
   }
 
-  setStart(startEpochMs: number) {
-    this.start = startEpochMs;
+  /** Restore the timer from a persisted map. runningSince null ⇒ paused. */
+  restore(accrued: number, runningSince: number | null) {
+    this.accrued = Math.max(0, accrued);
+    this.runningSince = runningSince;
   }
 
   getCurrentTime(): number {
-    return Math.max(0, (Date.now() - this.start) / 1000);
+    const live = this.runningSince === null ? 0 : (Date.now() - this.runningSince) / 1000;
+    return Math.max(0, this.accrued + live);
+  }
+
+  get paused(): boolean {
+    return this.runningSince === null;
+  }
+
+  /** Bank the in-flight segment and stop counting. No-op if already paused. */
+  pause() {
+    if (this.runningSince === null) return;
+    this.accrued += (Date.now() - this.runningSince) / 1000;
+    this.runningSince = null;
+  }
+
+  /** Start a fresh running segment. No-op if already running. */
+  resume() {
+    if (this.runningSince === null) this.runningSince = Date.now();
+  }
+
+  /** Zero the elapsed count, preserving the running/paused state. */
+  reset() {
+    this.accrued = 0;
+    this.runningSince = this.runningSince === null ? null : Date.now();
+  }
+
+  /** Map-shaped state for persistence. accrued excludes the live segment by design. */
+  snapshot(): { accrued: number; runningSince: number | null; paused: boolean } {
+    return { accrued: this.accrued, runningSince: this.runningSince, paused: this.paused };
   }
 
   seekTo(): void {}

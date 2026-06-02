@@ -27,6 +27,22 @@ export function useGlobalKeys(): void {
         return;
       }
 
+      // Manual timestamp. Ctrl/Cmd+T is the documented combo and works on desktop and
+      // on installed / fullscreen web (where a keyboard lock reclaims it); Alt+T is an
+      // always-available web fallback because the browser owns Ctrl+T (new tab) and
+      // won't release it otherwise. Handled before the Ctrl/Cmd gate so Alt+T still
+      // reaches it, and keyed off e.code so a modified "T" survives (Mac Option+T → †).
+      // Stamping targets the selected node, so it's fine to fire from inside a textarea.
+      if (e.code === "KeyT" && !e.shiftKey) {
+        const ctrlOrCmd = e.ctrlKey || e.metaKey;
+        // Exactly one of Ctrl/Cmd or Alt, so AltGr (Ctrl+Alt) text entry stays untouched.
+        if (ctrlOrCmd !== e.altKey) {
+          e.preventDefault();
+          if (st.selectedId) st.stamp(st.selectedId);
+          return;
+        }
+      }
+
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
 
@@ -65,14 +81,19 @@ export function useGlobalKeys(): void {
 
       const seek = st.controller.canSeek;
 
+      // Ctrl/Cmd+Space: toggle playback for a seekable media source, or pause/resume
+      // the live-lecture session timer for an external (non-seekable) source — a real
+      // break that banks elapsed seconds instead of letting the clock drift.
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (seek) st.playPause();
+        else st.pauseSession();
+        return;
+      }
+
       // Player controls — only when a seekable media source is active, so they
       // don't shadow text word-navigation (Ctrl+←/→) during plain note capture.
       if (seek) {
-        if (e.code === "Space") {
-          e.preventDefault();
-          st.playPause();
-          return;
-        }
         if (e.key === "ArrowLeft") {
           e.preventDefault();
           st.skip(-5);
@@ -118,9 +139,6 @@ export function useGlobalKeys(): void {
       } else if (e.key === "," && !e.shiftKey) {
         e.preventDefault();
         if (st.selectedId) st.expand(st.selectedId);
-      } else if (k === "t") {
-        e.preventDefault();
-        if (st.selectedId) st.stamp(st.selectedId);
       } else if (e.code === "Backslash") {
         // Cycle the v2 shell layout; Shift reverses. Keyed off e.code because the
         // shifted backslash reports as "|" on US layouts.

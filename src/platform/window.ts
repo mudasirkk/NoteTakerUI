@@ -4,6 +4,18 @@
 export const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+// True when the web build runs as an installed PWA (standalone-style window) rather
+// than a normal browser tab. Without a tab strip the browser stops reserving Ctrl+T
+// (and Ctrl+W/N) for itself, so our keydown handlers receive them and preventDefault
+// wins — that's how installed users get the real desktop shortcuts without fullscreen.
+// Evaluated once at load: an installed PWA launches in this mode from the start.
+export const isInstalledPWA =
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  ["standalone", "minimal-ui", "window-controls-overlay", "fullscreen"].some(
+    (mode) => window.matchMedia(`(display-mode: ${mode})`).matches
+  );
+
 type Win = {
   close: () => Promise<void>;
   minimize: () => Promise<void>;

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../../state/store";
 import { useAuth } from "../../auth/authStore";
+import { isTauri } from "../../platform/window";
 
 export function StatusBar() {
   const source = useStore((s) => s.map.source);
@@ -136,14 +137,18 @@ export function StatusBar() {
       </button>
 
       <span className={"seekflag" + (canSeek ? " on" : "")}>{canSeek ? "seek ●" : "timer"}</span>
-      <button
-        className={"pinflag" + (pinned ? " on" : "")}
-        onClick={togglePin}
-        title={pinned ? "Window stays on top — click to unpin" : "Pin window on top"}
-        aria-pressed={pinned}
-      >
-        {pinned ? "📌 pinned" : "pin"}
-      </button>
+      {/* Always-on-top is a native window feature; the browser can't honor it, so the
+          pin only appears in the desktop build. */}
+      {isTauri && (
+        <button
+          className={"pinflag" + (pinned ? " on" : "")}
+          onClick={togglePin}
+          title={pinned ? "Window stays on top — click to unpin" : "Pin window on top"}
+          aria-pressed={pinned}
+        >
+          {pinned ? "📌 pinned" : "pin"}
+        </button>
+      )}
       <span className={"savestate " + saveTone} title={saveTitle} aria-live="polite">
         <span className="save-dot" />
         {saveText}
