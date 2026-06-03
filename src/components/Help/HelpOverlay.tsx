@@ -77,7 +77,7 @@ export function HelpOverlay() {
           <span className="help-foot-tour">
             New to NoteTaker?{" "}
             <button className="help-foot-link" onClick={() => void openTutorial()}>
-              Take the quick tour ↗
+              Take the quick tour →
             </button>
           </span>
           {isBrowserTab && (

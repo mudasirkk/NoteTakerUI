@@ -170,17 +170,19 @@ body {
   overflow: hidden;
 }
 
-/* On the frameless desktop build the app fills the window edge-to-edge: drop the
-   stage inset and dotted backdrop, and strip the card frame (border/radius/shadow).
-   Otherwise the 18px padding is a dead, non-draggable margin that makes the window
-   look bigger than the app, and rounded corners would leak the backdrop at the
-   window edges. The browser build keeps its floating-card look. Gated by the
-   data-platform marker set in main.tsx before first paint. */
-[data-platform="desktop"] .stage {
+/* Both editions fill their viewport edge-to-edge. On the frameless desktop window
+   the 18px inset would be a dead, non-draggable margin that makes the window look
+   bigger than the app; in the browser/PWA it would just waste screen space on a
+   floating card. So drop the stage inset and dotted backdrop, and strip the card
+   frame (border/radius/shadow), for both. Gated by the data-platform marker set in
+   main.tsx before first paint. */
+[data-platform="desktop"] .stage,
+[data-platform="web"] .stage {
   padding: 0;
   background-image: none;
 }
-[data-platform="desktop"] .app {
+[data-platform="desktop"] .app,
+[data-platform="web"] .app {
   border: none;
   border-radius: 0;
   box-shadow: none;
@@ -845,8 +847,8 @@ body {
    two top-bar rows, status bar and footer — usable as the window keeps
    shrinking. Overflow fixes apply to BOTH editions (the frameless desktop
    window has a 320px min and is often parked narrow beside a video); the
-   touch-oriented bits (dropping the floating-card frame, hiding the keyboard
-   hint strip) are scoped to the web build only.
+   touch-oriented bit (hiding the keyboard hint strip) is scoped to the web build
+   only — the edge-to-edge fill now applies to every web width (see .stage above).
    ============================================================ */
 
 /* Tablet and below: the bottom control row can't fit on one line — let it wrap
@@ -861,12 +863,6 @@ body {
   .bar-bottom { padding: 0 10px 8px; }
   .statusbar { flex-wrap: wrap; padding: 5px 10px; gap: 8px; }
   .hints { padding: 7px 10px; gap: 9px; }
-
-  /* The web build floats as a padded, rounded card; at phone widths that inset
-     and frame only waste space, so fill the viewport like the desktop shell
-     already does. (Desktop's higher-specificity padding:0 rules are unaffected.) */
-  [data-platform="web"] .stage { padding: 0; background-image: none; }
-  [data-platform="web"] .app { border: none; border-radius: 0; box-shadow: none; }
 
   /* No window controls on web, so the title can take the full first row and the
      timer + pause/reset wrap underneath rather than crowding the title to nothing. */
