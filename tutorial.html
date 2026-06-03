@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NoteTaker — Quick Tour &amp; Feature Guide</title>
+<meta name="description" content="A two-minute tour of NoteTaker: timestamped outline-and-map notes for lectures and videos. Keyboard-first, on web and desktop." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=Spline+Sans+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#0f131a; --paper-2:#141a23; --paper-3:#1a212d;
+    --line:#28323f; --line-soft:#202a36;
+    --ink:#e9eef6; --ink-soft:#97a4ba; --ink-faint:#5d6a7e;
+    --accent:#34e7c4; --accent-deep:#15c2a1; --accent-ink:#04221c;
+    --amber:#f4b454; --violet:#9d8cff; --coral:#ff6f61;
+    --glow:rgba(52,231,196,.16);
+    --shadow:0 40px 90px -30px rgba(0,0,0,.7),0 14px 36px -18px rgba(0,0,0,.6);
+    --maxw:1180px;
+    --disp:"Bricolage Grotesque",system-ui,sans-serif;
+    --body:"Hanken Grotesk",system-ui,sans-serif;
+    --serif:"Instrument Serif",Georgia,serif;
+    --mono:"Spline Sans Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:radial-gradient(135% 90% at 86% -12%, #16202b 0%, var(--paper) 46%, #0a0d12 100%);
+    color:var(--ink); font-family:var(--body); font-size:17px; line-height:1.6;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden; min-height:100vh;
+  }
+  body::before{ /* faint baseline grid */
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.45;
+    background-image:linear-gradient(var(--line-soft) 1px,transparent 1px);
+    background-size:100% 34px;
+    -webkit-mask-image:linear-gradient(transparent,#000 7%,#000 93%,transparent);
+            mask-image:linear-gradient(transparent,#000 7%,#000 93%,transparent);
+  }
+  .grain{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.04;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  .aurora{position:fixed;z-index:0;pointer-events:none;width:640px;height:640px;top:-260px;right:-160px;
+    background:radial-gradient(circle at 50% 50%, var(--glow), transparent 64%);filter:blur(20px);}
+  .wrap{position:relative;z-index:2;max-width:var(--maxw);margin:0 auto;padding:0 26px}
+
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--accent);color:var(--accent-ink)}
+
+  /* ---- key chips ---- */
+  kbd,.k{font-family:var(--mono);font-size:.78em;line-height:1;display:inline-block;
+    color:var(--ink);background:linear-gradient(180deg,#222c39,#192129);
+    border:1px solid var(--line);border-bottom-color:#0c1117;border-radius:6px;
+    padding:3px 7px;box-shadow:0 1px 0 #0b0f15, inset 0 1px 0 rgba(255,255,255,.03);white-space:nowrap}
+  .mono{font-family:var(--mono)}
+
+  /* ---------- masthead ---------- */
+  header.mast{padding:60px 0 36px;border-bottom:1px solid var(--line);position:relative}
+  .brandrow{display:flex;align-items:center;gap:15px}
+  .mark{width:52px;height:52px;border-radius:14px;flex:none;
+    background:linear-gradient(150deg,#1d6b5d,#34e7c4 70%);display:grid;place-items:center;
+    box-shadow:0 10px 30px -10px var(--glow),inset 0 1px 0 rgba(255,255,255,.25)}
+  .mark svg{width:30px;height:30px;display:block}
+  .brand-name{font-family:var(--disp);font-weight:700;font-size:21px;letter-spacing:-.01em}
+  .brand-sub{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-faint)}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.32em;text-transform:uppercase;color:var(--accent-deep);
+    display:flex;gap:12px;align-items:center;margin:30px 0 8px}
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent)}
+  h1.title{font-family:var(--disp);font-weight:800;font-size:clamp(40px,7vw,84px);line-height:.98;letter-spacing:-.025em;margin:.08em 0 .2em}
+  h1.title em{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--accent)}
+  .lede{font-size:clamp(17px,2.1vw,21px);max-width:58ch;color:var(--ink-soft)}
+  .lede strong{color:var(--ink);font-weight:600}
+  .cta{margin-top:26px;display:flex;gap:12px;flex-wrap:wrap}
+  .btn{font-family:var(--disp);font-weight:600;font-size:15px;border-radius:11px;padding:11px 20px;
+    border:1px solid var(--line);color:var(--ink);background:var(--paper-2);transition:.18s;cursor:pointer}
+  .btn:hover{border-color:var(--accent-deep);transform:translateY(-2px)}
+  .btn.go{background:linear-gradient(180deg,#34e7c4,#15c2a1);color:var(--accent-ink);border-color:transparent;box-shadow:0 14px 34px -16px var(--glow)}
+  .btn.go:hover{box-shadow:0 18px 40px -14px var(--glow)}
+
+  /* ---------- layout ---------- */
+  .grid{display:grid;grid-template-columns:200px 1fr;gap:50px;align-items:start;margin-top:42px;padding-bottom:60px}
+  nav.toc{position:sticky;top:22px;font-family:var(--mono);font-size:12.5px}
+  nav.toc .tlabel{letter-spacing:.22em;text-transform:uppercase;color:var(--ink-faint);font-size:10.5px;padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:10px}
+  nav.toc ol{list-style:none;counter-reset:t}
+  nav.toc li{counter-increment:t}
+  nav.toc a{display:flex;gap:10px;color:var(--ink-soft);padding:6px 9px;border-radius:8px;transition:.16s}
+  nav.toc a::before{content:counter(t,decimal-leading-zero);color:var(--accent-deep);font-weight:700}
+  nav.toc a:hover{background:var(--paper-2);color:var(--ink);transform:translateX(3px)}
+  nav.toc a.on{background:var(--paper-2);color:var(--ink)}
+  nav.toc a.on::before{color:var(--accent)}
+
+  main{min-width:0}
+  section{margin-bottom:58px;scroll-margin-top:22px}
+  .sec-head{display:flex;align-items:baseline;gap:15px;border-bottom:1px solid var(--line);padding-bottom:11px;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-weight:700;color:var(--accent-deep);font-size:14px;padding-top:3px}
+  h2{font-family:var(--disp);font-weight:700;font-size:clamp(26px,3.6vw,36px);line-height:1.05;letter-spacing:-.02em}
+  .intro{color:var(--ink-soft);margin:0 0 20px;max-width:64ch;font-size:15.5px}
+
+  /* ---- tour steps ---- */
+  .tour{display:grid;gap:12px;counter-reset:s}
+  .step{counter-increment:s;display:grid;grid-template-columns:46px 1fr;gap:16px;align-items:center;
+    background:linear-gradient(180deg,#151c26,#11161e);border:1px solid var(--line);border-radius:16px;padding:16px 20px;position:relative;overflow:hidden;transition:.18s}
+  .step:hover{border-color:var(--accent-deep);transform:translateY(-2px);box-shadow:var(--shadow)}
+  .step::after{content:counter(s,decimal-leading-zero);position:absolute;right:14px;bottom:-16px;font-family:var(--disp);font-weight:800;font-size:74px;color:#fff;opacity:.03;line-height:1}
+  .step .sn{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;background:var(--paper-3);border:1px solid var(--line);color:var(--accent)}
+  .step .sn svg{width:24px;height:24px}
+  .step h3{font-family:var(--disp);font-weight:600;font-size:16px;color:var(--ink);margin:0 0 2px}
+  .step p{margin:0;font-size:14.5px;color:var(--ink-soft);max-width:none}
+
+  /* ---- feature cards ---- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:12px}
+  .card{background:linear-gradient(180deg,#151c26,#11161e);border:1px solid var(--line);border-radius:15px;padding:16px 17px;transition:.18s;position:relative;overflow:hidden}
+  .card:hover{transform:translateY(-3px);border-color:var(--accent-deep);box-shadow:var(--shadow)}
+  .card .ico{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:var(--paper-3);border:1px solid var(--line);color:var(--accent);margin-bottom:10px}
+  .card .ico svg{width:18px;height:18px}
+  .card h4{font-family:var(--disp);font-weight:600;font-size:16px;color:var(--ink);margin:0 0 4px}
+  .card p{font-size:13.5px;margin:0;color:var(--ink-soft);line-height:1.5}
+  .card .keys{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
+
+  /* ---- compare ---- */
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px}
+  .col{border:1px solid var(--line);border-radius:16px;padding:18px 20px;background:linear-gradient(180deg,#151c26,#11161e);position:relative}
+  .col.web{border-color:var(--accent-deep)} .col.desk{border-color:var(--violet)}
+  .col .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint)}
+  .col h4{font-family:var(--disp);font-weight:700;font-size:20px;color:var(--ink);margin:3px 0 12px}
+  .col.web h4 span{color:var(--accent)} .col.desk h4 span{color:var(--violet)}
+  .col ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+  .col li{display:flex;gap:10px;font-size:14px;color:var(--ink-soft)}
+  .col li::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;margin-top:6px;background:var(--accent-deep)}
+  .col.desk li::before{background:var(--violet)}
+  .note{border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:12px;background:var(--paper-2);
+    padding:13px 16px;margin-top:14px;font-size:14px;color:var(--ink-soft);line-height:1.55}
+  .note b{color:var(--ink)}
+
+  /* ---- cheat sheet ---- */
+  .sheet{columns:2;column-gap:28px}
+  .grp{break-inside:avoid;margin-bottom:20px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--paper-2)}
+  .grp h4{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-deep);
+    padding:10px 15px;border-bottom:1px solid var(--line);background:var(--paper-3)}
+  .grp h4 .cap{color:var(--ink-faint);text-transform:none;letter-spacing:0}
+  .krow{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:8px 15px;border-top:1px solid var(--line-soft)}
+  .krow:first-of-type{border-top:none}
+  .krow .act{font-size:13px;color:var(--ink-soft)}
+  .krow .keys{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;flex:none}
+
+  /* ---- footer ---- */
+  footer.foot{border-top:1px solid var(--line);padding:30px 0 60px;margin-top:6px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+  footer.foot .f-note{font-size:13px;color:var(--ink-faint);max-width:50ch}
+  footer.foot .f-note b{color:var(--ink-soft)}
+
+  @media (max-width:880px){
+    .grid{grid-template-columns:1fr;gap:8px}
+    nav.toc{position:static;display:none}
+    .vs{grid-template-columns:1fr}
+    .sheet{columns:1}
+  }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="aurora"></div>
+
+<div class="wrap">
+  <!-- ===================== MASTHEAD ===================== -->
+  <header class="mast">
+    <div class="brandrow">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#04221c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 6h10M4 11h7M4 16h9"/><circle cx="18" cy="15.5" r="4.2" stroke-width="1.8"/><path d="M18 13.6v2l1.3.9" stroke-width="1.6"/>
+        </svg>
+      </span>
+      <span>
+        <div class="brand-name">NoteTaker</div>
+        <div class="brand-sub">Quick Tour</div>
+      </span>
+    </div>
+
+    <div class="eyebrow"><span class="dot"></span> Quick tour</div>
+    <h1 class="title">Notes that remember <em>exactly when</em> you wrote them.</h1>
+    <p class="lede">Type as you watch. Every line is <strong>stamped to the video's timeline</strong> — click a note to jump the video back to that moment. Then flip your outline into a <strong>mind-map</strong>.</p>
+
+    <div class="cta">
+      <a class="btn go" href="https://notetakerui.web.app">Open the web app →</a>
+      <a class="btn" href="#tour">Take the 60-second tour</a>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- ===================== TOC ===================== -->
+    <nav class="toc" aria-label="Contents">
+      <div class="tlabel">On this page</div>
+      <ol>
+        <li><a href="#tour">60-second tour</a></li>
+        <li><a href="#capture">Capture</a></li>
+        <li><a href="#stamps">Timestamps</a></li>
+        <li><a href="#player">Player</a></li>
+        <li><a href="#map">Outline ↔ Map</a></li>
+        <li><a href="#move">Navigate</a></li>
+        <li><a href="#yours">Make it yours</a></li>
+        <li><a href="#sync">Sync &amp; offline</a></li>
+        <li><a href="#editions">Web vs Desktop</a></li>
+        <li><a href="#cheat">Cheat-sheet</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <!-- ===================== TOUR ===================== -->
+      <section id="tour">
+        <div class="sec-head"><span class="sec-num">01</span><h2>The 60-second tour</h2></div>
+        <p class="intro">Four moves and you know the app.</p>
+        <div class="tour">
+          <div class="step">
+            <span class="sn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v12H4z"/><path d="m10 9 5 3-5 3z"/></svg></span>
+            <div><h3>Pick a source</h3><p>A YouTube link, a local video, or just the session timer — from the top bar.</p></div>
+          </div>
+          <div class="step">
+            <span class="sn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M4 11h7M4 16h12"/></svg></span>
+            <div><h3>Capture in the outline</h3><p>Type to take notes. <kbd>Enter</kbd> new line · <kbd>Tab</kbd> nest · <kbd>⇧Tab</kbd> un-nest.</p></div>
+          </div>
+          <div class="step">
+            <span class="sn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span>
+            <div><h3>Jump back by timestamp</h3><p>Every note is stamped. Click a timestamp to seek the video right there.</p></div>
+          </div>
+          <div class="step">
+            <span class="sn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="7" r="2.4"/><circle cx="18" cy="7" r="2.4"/><circle cx="12" cy="17" r="2.4"/><path d="M7.6 8.6 11 15M16.4 8.6 13 15"/></svg></span>
+            <div><h3>Review as a map</h3><p><kbd>Ctrl+M</kbd> turns the outline into a mind-map. Drag node to node to link ideas.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== CAPTURE ===================== -->
+      <section id="capture">
+        <div class="sec-head"><span class="sec-num">02</span><h2>Capture</h2></div>
+        <p class="intro">A fast, nestable list — your hands stay on the keyboard.</p>
+        <div class="cards">
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+            <h4>New &amp; nest</h4>
+            <p><kbd>Enter</kbd> adds a sibling; <kbd>Tab</kbd>/<kbd>⇧Tab</kbd> nests and un-nests.</p>
+            <div class="keys"><kbd>Enter</kbd><kbd>Tab</kbd><kbd>⇧Tab</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h10M4 17h7"/></svg></div>
+            <h4>Soft break</h4>
+            <p>A second line inside one note — no new item.</p>
+            <div class="keys"><kbd>⇧Enter</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6 4 12l5 6M20 12H4"/></svg></div>
+            <h4>Delete</h4>
+            <p><kbd>⌫</kbd> clears an empty line; <kbd>Ctrl+⇧⌫</kbd> deletes a note and its children.</p>
+            <div class="keys"><kbd>⌫</kbd><kbd>Ctrl+⇧⌫</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v3"/></svg></div>
+            <h4>Undo / redo</h4>
+            <p>Full history — nothing is a one-way door.</p>
+            <div class="keys"><kbd>Ctrl+Z</kbd><kbd>Ctrl+⇧Z</kbd></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== STAMPS ===================== -->
+      <section id="stamps">
+        <div class="sec-head"><span class="sec-num">03</span><h2>Timestamps</h2></div>
+        <p class="intro">The heart of NoteTaker: notes pin to the video's time, then become clickable bookmarks.</p>
+        <div class="cards">
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></div>
+            <h4>Stamp a note</h4>
+            <p>Insert or refresh the time on the current note.</p>
+            <div class="keys"><kbd>Ctrl+T</kbd><kbd>Alt+T</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></div>
+            <h4>Click to seek</h4>
+            <p>Click any timestamp — the player jumps there.</p>
+            <div class="keys"><kbd>click ⏱</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+            <h4>Auto-stamp</h4>
+            <p>Every new note timed for you. Toggle in the palette.</p>
+            <div class="keys"><kbd>Ctrl+K</kbd></div>
+          </div>
+        </div>
+        <div class="note"><b>Why two keys?</b> A browser tab reserves <kbd>Ctrl+T</kbd> for new tabs, so the web uses <kbd>Alt+T</kbd>. Install NoteTaker as an app and <kbd>Ctrl+T</kbd> works again — same as desktop.</div>
+      </section>
+
+      <!-- ===================== PLAYER ===================== -->
+      <section id="player">
+        <div class="sec-head"><span class="sec-num">04</span><h2>Player</h2></div>
+        <p class="intro">Drive playback without the mouse. With no video, <kbd>Ctrl+Space</kbd> pauses the session timer.</p>
+        <div class="cards">
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v16M18 4v16"/></svg></div>
+            <h4>Play / pause</h4>
+            <p>Start, stop, or pause the timer.</p>
+            <div class="keys"><kbd>Ctrl+Space</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m11 7-5 5 5 5M18 7l-5 5 5 5"/></svg></div>
+            <h4>Rewind / forward</h4>
+            <p>Nudge the playhead to re-hear a phrase.</p>
+            <div class="keys"><kbd>Ctrl+←</kbd><kbd>Ctrl+→</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h7M4 7h12M4 17h9"/><path d="m17 9 3 3-3 3"/></svg></div>
+            <h4>Slower / faster</h4>
+            <p>Step the playback rate up or down.</p>
+            <div class="keys"><kbd>Ctrl+⇧&lt;</kbd><kbd>Ctrl+⇧&gt;</kbd></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== MAP ===================== -->
+      <section id="map">
+        <div class="sec-head"><span class="sec-num">05</span><h2>Outline ↔ Map</h2></div>
+        <p class="intro">Same notes, two views: a list to capture, a map to connect.</p>
+        <div class="cards">
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M4 10h16"/></svg></div>
+            <h4>Flip the view</h4>
+            <p>Swap between outline and mind-map.</p>
+            <div class="keys"><kbd>Ctrl+M</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.3"/><circle cx="18" cy="12" r="2.3"/><circle cx="6" cy="18" r="2.3"/><path d="M8 7l8 4M8 17l8-5"/></svg></div>
+            <h4>Link ideas</h4>
+            <p>Drag node to node to connect thoughts.</p>
+            <div class="keys"><kbd>drag</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></div>
+            <h4>Zoom &amp; fold</h4>
+            <p>Focus a branch, or collapse and expand subtrees.</p>
+            <div class="keys"><kbd>Ctrl+]</kbd><kbd>Ctrl+.</kbd><kbd>Ctrl+,</kbd></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== MOVE ===================== -->
+      <section id="move">
+        <div class="sec-head"><span class="sec-num">06</span><h2>Navigate</h2></div>
+        <p class="intro">Two palettes do the heavy lifting.</p>
+        <div class="cards">
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+            <h4>Jump palette</h4>
+            <p>Fuzzy-jump to any note by name.</p>
+            <div class="keys"><kbd>Ctrl+P</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg></div>
+            <h4>Command palette</h4>
+            <p>Run any command — no need to memorize keys.</p>
+            <div class="keys"><kbd>Ctrl+K</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m6 11 6 6 6-6"/></svg></div>
+            <h4>Reorder &amp; focus</h4>
+            <p><kbd>Ctrl+↑↓</kbd> moves a note; <kbd>↑↓</kbd> moves the cursor.</p>
+            <div class="keys"><kbd>Ctrl+↑</kbd><kbd>Ctrl+↓</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v12H4z"/><path d="M8 6V4h8v2"/></svg></div>
+            <h4>Many maps</h4>
+            <p>A separate map per course or topic.</p>
+            <div class="keys"><kbd>Ctrl+O</kbd></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== YOURS ===================== -->
+      <section id="yours">
+        <div class="sec-head"><span class="sec-num">07</span><h2>Make it yours</h2></div>
+        <p class="intro">Bend the workspace to fit you.</p>
+        <div class="cards">
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v16H4zM13 4h7v16h-7z"/></svg></div>
+            <h4>Layouts</h4>
+            <p>Cycle how notes and video sit together.</p>
+            <div class="keys"><kbd>Ctrl+\</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M13 12h5v5h-5z"/></svg></div>
+            <h4>Picture-in-picture</h4>
+            <p>Float the video in a draggable frame.</p>
+            <div class="keys"><kbd>PiP</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
+            <h4>Themes &amp; notes-only</h4>
+            <p>Dark or light, or hide the player entirely.</p>
+            <div class="keys"><kbd>Ctrl+K</kbd></div>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v6c0 4 3.5 6.5 8 8 4.5-1.5 8-4 8-8V7z"/></svg></div>
+            <h4>Always-on-top <span class="cap" style="color:var(--ink-faint);font-weight:400">· desktop</span></h4>
+            <p>Pin above everything; summon from anywhere.</p>
+            <div class="keys"><kbd>Ctrl+Alt+N</kbd></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== SYNC ===================== -->
+      <section id="sync">
+        <div class="sec-head"><span class="sec-num">08</span><h2>Sync &amp; offline</h2></div>
+        <p class="intro">Local-first — sign in and your maps follow you.</p>
+        <div class="cards">
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg></div>
+            <h4>Sign in to sync</h4>
+            <p>Google sign-in syncs web ↔ desktop.</p>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16a4 4 0 0 1 1-7.9A5.5 5.5 0 0 1 17 8a3.5 3.5 0 0 1 1 6.9"/></svg></div>
+            <h4>Works offline</h4>
+            <p>Installed, it runs with no connection.</p>
+          </div>
+          <div class="card">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M5 19h14"/></svg></div>
+            <h4>Export Markdown</h4>
+            <p>Export any map to clean Markdown.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== EDITIONS ===================== -->
+      <section id="editions">
+        <div class="sec-head"><span class="sec-num">09</span><h2>Web vs Desktop</h2></div>
+        <p class="intro">Same notes, shortcuts, and account. Only the platform powers differ.</p>
+        <div class="vs">
+          <div class="col web">
+            <div class="tag">Runs anywhere</div>
+            <h4>Web <span>·</span> PWA</h4>
+            <ul>
+              <li>Nothing to install — open the link</li>
+              <li>Installable; own window, works offline</li>
+              <li>Once installed, shortcuts match desktop — incl. <kbd>Ctrl+T</kbd></li>
+              <li>In a plain tab, use <kbd>Alt+T</kbd> for timestamps</li>
+            </ul>
+          </div>
+          <div class="col desk">
+            <div class="tag">Maximum power</div>
+            <h4>Desktop <span>·</span> app</h4>
+            <ul>
+              <li>Always-on-top overlay above your video</li>
+              <li>Global <kbd>Ctrl+Alt+N</kbd> to show / hide</li>
+              <li>Downloads embed-blocked videos to keep seek working</li>
+              <li>Native window controls</li>
+            </ul>
+          </div>
+        </div>
+        <div class="note"><b>Blocked videos:</b> some disable embedding. Desktop downloads a seekable copy; the web shows a note with a link to watch on YouTube. Everything else is identical.</div>
+      </section>
+
+      <!-- ===================== CHEAT SHEET ===================== -->
+      <section id="cheat">
+        <div class="sec-head"><span class="sec-num">10</span><h2>Cheat-sheet</h2></div>
+        <p class="intro">The full set. Press <kbd>?</kbd> in the app for the same list, matched to your platform.</p>
+        <div class="sheet">
+          <div class="grp">
+            <h4>Capture</h4>
+            <div class="krow"><span class="act">New sibling below</span><span class="keys"><kbd>Enter</kbd></span></div>
+            <div class="krow"><span class="act">Indent / outdent</span><span class="keys"><kbd>Tab</kbd><kbd>⇧Tab</kbd></span></div>
+            <div class="krow"><span class="act">Soft line break</span><span class="keys"><kbd>⇧Enter</kbd></span></div>
+            <div class="krow"><span class="act">Delete empty note</span><span class="keys"><kbd>⌫</kbd></span></div>
+            <div class="krow"><span class="act">Delete note &amp; children</span><span class="keys"><kbd>Ctrl+⇧⌫</kbd></span></div>
+            <div class="krow"><span class="act">Insert / refresh timestamp</span><span class="keys"><kbd>Ctrl+T</kbd><kbd>Alt+T</kbd></span></div>
+            <div class="krow"><span class="act">Undo / redo</span><span class="keys"><kbd>Ctrl+Z</kbd><kbd>Ctrl+⇧Z</kbd></span></div>
+          </div>
+          <div class="grp">
+            <h4>Reorder</h4>
+            <div class="krow"><span class="act">Move among siblings</span><span class="keys"><kbd>Ctrl+↑</kbd><kbd>Ctrl+↓</kbd></span></div>
+          </div>
+          <div class="grp">
+            <h4>Navigate</h4>
+            <div class="krow"><span class="act">Move focus between notes</span><span class="keys"><kbd>↑</kbd><kbd>↓</kbd></span></div>
+            <div class="krow"><span class="act">Jump palette</span><span class="keys"><kbd>Ctrl+P</kbd></span></div>
+            <div class="krow"><span class="act">Command palette</span><span class="keys"><kbd>Ctrl+K</kbd></span></div>
+            <div class="krow"><span class="act">Switch maps</span><span class="keys"><kbd>Ctrl+O</kbd></span></div>
+            <div class="krow"><span class="act">Zoom into note / out</span><span class="keys"><kbd>Ctrl+]</kbd><kbd>Ctrl+[</kbd></span></div>
+          </div>
+          <div class="grp">
+            <h4>Fold</h4>
+            <div class="krow"><span class="act">Collapse subtree</span><span class="keys"><kbd>Ctrl+.</kbd></span></div>
+            <div class="krow"><span class="act">Expand subtree</span><span class="keys"><kbd>Ctrl+,</kbd></span></div>
+          </div>
+          <div class="grp">
+            <h4>Player <span class="cap">· seekable video</span></h4>
+            <div class="krow"><span class="act">Play / pause · pause timer</span><span class="keys"><kbd>Ctrl+Space</kbd></span></div>
+            <div class="krow"><span class="act">Rewind / forward</span><span class="keys"><kbd>Ctrl+←</kbd><kbd>Ctrl+→</kbd></span></div>
+            <div class="krow"><span class="act">Slower / faster</span><span class="keys"><kbd>Ctrl+⇧&lt;</kbd><kbd>Ctrl+⇧&gt;</kbd></span></div>
+          </div>
+          <div class="grp">
+            <h4>App</h4>
+            <div class="krow"><span class="act">Outline / Map</span><span class="keys"><kbd>Ctrl+M</kbd></span></div>
+            <div class="krow"><span class="act">Cycle layout / reverse</span><span class="keys"><kbd>Ctrl+\</kbd><kbd>Ctrl+⇧\</kbd></span></div>
+            <div class="krow"><span class="act">Save</span><span class="keys"><kbd>Ctrl+S</kbd></span></div>
+            <div class="krow"><span class="act">Keyboard shortcuts</span><span class="keys"><kbd>?</kbd></span></div>
+            <div class="krow"><span class="act">Show / hide <span class="cap">(desktop)</span></span><span class="keys"><kbd>Ctrl+Alt+N</kbd></span></div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <span class="f-note"><b>NoteTaker</b> — timestamped outline-and-map notes for lectures and videos. Shortcuts adapt to your platform automatically.</span>
+        <a class="btn go" href="https://notetakerui.web.app">Start taking notes →</a>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+  // Highlight the table-of-contents entry for whichever section is in view.
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+    if (!links.length || !('IntersectionObserver' in window)) return;
+    var byId = {};
+    links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (l) { l.classList.remove('on'); });
+        var a = byId[e.target.id];
+        if (a) a.classList.add('on');
+      });
+    }, { rootMargin: '-18% 0px -72% 0px', threshold: 0 });
+    document.querySelectorAll('main section[id]').forEach(function (s) { obs.observe(s); });
+  })();
+</script>
+</body>
+</html>
