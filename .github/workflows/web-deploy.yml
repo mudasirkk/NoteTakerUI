@@ -23,10 +23,10 @@ jobs:
     name: Build & deploy to Firebase Hosting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -46,6 +46,13 @@ jobs:
 
       - name: Deploy to Firebase Hosting (live channel)
         uses: FirebaseExtended/action-hosting-deploy@v0
+        # This action has no Node-24 release yet (latest tag v0.10.0 still declares
+        # runs.using: node20), so force the runner to execute it on Node 24. Without
+        # this it breaks after GitHub drops Node 20 from the runners (forced switch
+        # 2026-06-16). Safe to remove once a node24 release ships and @v0 adopts it —
+        # the flag only upgrades node20 actions, so it's a no-op against node24 ones.
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
