@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../../state/store";
 import { useFocusTrap } from "../../keyboard/useFocusTrap";
-import { KEYMAP, GROUP_ORDER, GROUP_NOTES, type KeyGroup } from "../../keyboard/keymap";
+import { KEYMAP, GROUP_ORDER, GROUP_NOTES, isBrowserTab, type KeyGroup } from "../../keyboard/keymap";
 
 // The "?" keyboard-shortcuts overlay (UI-3). Rendered straight from KEYMAP so it
 // can never drift from the real bindings — the footer hint strip reads the same
@@ -73,6 +73,14 @@ export function HelpOverlay() {
           <span>
             Press <kbd>?</kbd> any time · <kbd>Esc</kbd> to close
           </span>
+          {isBrowserTab && (
+            <span className="help-foot-tip">
+              Tip: <b>install NoteTaker as an app</b> (look for the install icon in your
+              browser's address bar). The shortcuts then match the desktop app — including{" "}
+              <kbd>Ctrl+T</kbd> for timestamps. In a plain browser tab use <kbd>Alt+T</kbd>,
+              since the browser keeps <kbd>Ctrl+T</kbd> for itself.
+            </span>
+          )}
         </div>
       </div>
     </div>

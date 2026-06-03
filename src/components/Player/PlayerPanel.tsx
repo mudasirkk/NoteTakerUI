@@ -40,6 +40,14 @@ export function PlayerPanel() {
     if (ok) setHasCookies(true);
   };
 
+  // Web only: YouTubePlayer reports here when the owner has disabled embedding. A
+  // browser can't fetch a seekable copy (no native yt-dlp), so we surface a short
+  // explanatory note rather than failing silently. Reset whenever the source changes.
+  const [embedBlocked, setEmbedBlocked] = useState(false);
+  useEffect(() => {
+    setEmbedBlocked(false);
+  }, [source?.url]);
+
   const type = source?.type ?? "external";
   if (type === "external") return null;
 
@@ -66,7 +74,7 @@ export function PlayerPanel() {
           (ytLocalUrl ? (
             <LocalVideoPlayer src={ytLocalUrl} />
           ) : source?.url ? (
-            <YouTubePlayer url={source.url} />
+            <YouTubePlayer url={source.url} onEmbedBlocked={() => setEmbedBlocked(true)} />
           ) : (
             <div className="player-warn">No YouTube URL set.</div>
           ))}
@@ -146,6 +154,31 @@ export function PlayerPanel() {
               {hasCookies ? "Cookies ✓" : "Use cookies file"}
             </button>
           )}
+        </div>
+      )}
+
+      {/* Web build: an embedding-disabled video can't be downloaded for click-to-seek
+          (a browser has no native downloader), so explain the limitation instead of
+          failing silently. The desktop build handles this case via the strip above. */}
+      {!isTauri && type === "youtube" && embedBlocked && !ytLocalUrl && (
+        <div className="player-ytbar">
+          <span className="player-ytnote web">
+            Embedding is disabled for this video, so click-to-seek isn't available in the
+            browser. The <strong>NoteTaker desktop app</strong> can download a seekable copy.
+            {source?.url && (
+              <>
+                {" "}
+                <a
+                  className="player-ytlink"
+                  href={source.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Watch on YouTube ↗
+                </a>
+              </>
+            )}
+          </span>
         </div>
       )}
     </section>

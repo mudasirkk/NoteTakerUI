@@ -3,10 +3,20 @@ import { useStore } from "../../state/store";
 import { YouTubeController, type YTPlayerLike } from "../../player/PlayerController";
 import { loadYouTubeAPI, parseYouTubeId } from "../../player/youtubeApi";
 
-export function YouTubePlayer({ url }: { url: string }) {
+export function YouTubePlayer({
+  url,
+  onEmbedBlocked,
+}: {
+  url: string;
+  onEmbedBlocked?: () => void;
+}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const setController = useStore((s) => s.setController);
   const clearController = useStore((s) => s.clearController);
+  // Hold the latest callback in a ref so the player effect doesn't re-run (tearing
+  // down and rebuilding the iframe) just because the parent handed it a new closure.
+  const onEmbedBlockedRef = useRef(onEmbedBlocked);
+  onEmbedBlockedRef.current = onEmbedBlocked;
 
   useEffect(() => {
     const videoId = parseYouTubeId(url);
@@ -31,12 +41,15 @@ export function YouTubePlayer({ url }: { url: string }) {
             player = e.target;
             setController(new YouTubeController(player));
           },
-          // 101 / 150: the owner disabled embedding. Rather than degrade to an
-          // un-seekable timer, download the video and play it locally (DC-3). The
-          // store guards against duplicate/in-flight downloads.
+          // 101 / 150: the owner disabled embedding. On desktop we recover by
+          // downloading the video and playing it back locally (DC-3) — the store
+          // guards against duplicate/in-flight downloads. In a browser there is no
+          // native downloader, so we also notify the panel so it can show a short
+          // "use the desktop app" note (downloadActiveYouTube simply no-ops on web).
           onError: (e) => {
             if (cancelled) return;
             if (e.data === 101 || e.data === 150) {
+              onEmbedBlockedRef.current?.();
               void useStore.getState().downloadActiveYouTube();
             }
           },

@@ -27,7 +27,7 @@ const RAW: Binding[] = [
   { combo: "⇧Enter", action: "Soft line break", group: "Capture" },
   { combo: "⌫", action: "Delete empty node", group: "Capture" },
   { combo: "Ctrl+⇧⌫", action: "Delete note & children", group: "Capture" },
-  { combo: "Ctrl+T", web: "Alt+T", action: "Insert / refresh timestamp", group: "Capture" },
+  { combo: "Ctrl+T", web: "Alt+T", action: "Insert / refresh timestamp", group: "Capture", footer: true, short: "stamp" },
   { combo: "Ctrl+Z", action: "Undo", group: "Capture" },
   { combo: "Ctrl+⇧Z", action: "Redo", group: "Capture" },
   { combo: "Ctrl+↑ / Ctrl+↓", action: "Move among siblings", group: "Reorder", footer: true, footerCombo: "Ctrl+↑↓", short: "move" },
@@ -63,6 +63,12 @@ export const KEYMAP: Binding[] = RAW.filter((b) => isTauri || !b.desktopOnly).ma
 // The timestamp shortcut the UI should advertise, reused by the command palette so
 // its hint matches the footer/overlay across desktop, installed PWA and plain tab.
 export const STAMP_COMBO = useNativeCombos ? "Ctrl+T" : "Alt+T";
+
+// True only in a plain browser tab (web build, not installed, not desktop) — the one
+// place a handful of combos fall back to their `web` overrides because the browser
+// reserves them. Installing the PWA or running the desktop app flips this false and
+// restores the real desktop combos; the help overlay surfaces that as a tip.
+export const isBrowserTab = !useNativeCombos;
 
 // Heading order for the overlay, plus an optional caveat shown beside a heading.
 export const GROUP_ORDER: KeyGroup[] = ["Capture", "Reorder", "Navigate", "Fold", "Player", "App"];

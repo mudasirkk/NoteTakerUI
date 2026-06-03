@@ -388,6 +388,10 @@ body {
 .player-ytnote { display: inline-flex; align-items: center; gap: 7px; color: var(--ink-soft); }
 .player-ytnote.error { color: var(--accent-deep); flex-wrap: wrap; }
 .player-ytnote.prompt { flex-wrap: wrap; }
+/* Web-only embed-disabled note: a wrapping sentence, not a single inline-flex row. */
+.player-ytnote.web { display: block; line-height: 1.5; }
+.player-ytlink { color: var(--accent-deep); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+.player-ytlink:hover { color: var(--accent); }
 .player-ytbtn.ghost { background: transparent; }
 .player-ytbtn {
   border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-soft);
@@ -610,6 +614,8 @@ body {
   font-family: "Spline Sans Mono", monospace; font-size: 10px; color: var(--ink-soft); background: var(--paper-3);
   border: 1px solid var(--line); border-radius: 4px; padding: 0 4px;
 }
+.help-foot-tip { display: block; margin-top: 7px; line-height: 1.5; color: var(--ink-soft); }
+.help-foot-tip b { color: var(--ink); font-weight: 600; }
 .help-grid::-webkit-scrollbar { width: 10px; }
 .help-grid::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; border: 3px solid var(--paper-2); }
 
