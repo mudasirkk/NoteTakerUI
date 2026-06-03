@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { loadPref, savePref } from "../../platform/uiPrefs";
+import { openTutorial } from "../../platform/tutorial";
 
 // One-time getting-started card (UX-8). A non-modal coachmark walking the four
 // core moves — source → capture → seek → map — shown once per install and then
@@ -71,9 +72,14 @@ export function Onboarding() {
           </li>
         ))}
       </ol>
-      <button className="onboard-go" onClick={dismiss}>
-        Got it
-      </button>
+      <div className="onboard-foot">
+        <button className="onboard-tour" onClick={() => void openTutorial()}>
+          Take the tour
+        </button>
+        <button className="onboard-go" onClick={dismiss}>
+          Got it
+        </button>
+      </div>
     </div>
   );
 }

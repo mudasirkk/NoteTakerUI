@@ -616,6 +616,9 @@ body {
 }
 .help-foot-tip { display: block; margin-top: 7px; line-height: 1.5; color: var(--ink-soft); }
 .help-foot-tip b { color: var(--ink); font-weight: 600; }
+.help-foot-tour { display: block; margin-top: 7px; }
+.help-foot-link { font: inherit; color: var(--accent-deep); background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.help-foot-link:hover { color: var(--accent); }
 .help-grid::-webkit-scrollbar { width: 10px; }
 .help-grid::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; border: 3px solid var(--paper-2); }
 
@@ -643,12 +646,12 @@ body {
 }
 .onboard-step-txt { font-family: "Hanken Grotesk", system-ui, sans-serif; font-size: 12.5px; line-height: 1.4; color: var(--ink-soft); }
 .onboard-step-txt b { color: var(--ink); font-weight: 600; }
-.onboard-go {
-  display: block; width: calc(100% - 28px); margin: 6px 14px 14px; padding: 7px 0;
-  font: inherit; font-size: 12.5px; color: var(--accent-ink); background: var(--accent);
-  border: none; border-radius: 8px; cursor: pointer;
-}
+.onboard-foot { display: flex; gap: 8px; padding: 8px 14px 14px; }
+.onboard-foot button { flex: 1; padding: 7px 0; font: inherit; font-size: 12.5px; border-radius: 8px; cursor: pointer; }
+.onboard-go { color: var(--accent-ink); background: var(--accent); border: none; }
 .onboard-go:hover { background: var(--accent-deep); }
+.onboard-tour { color: var(--ink); background: transparent; border: 1px solid var(--line); }
+.onboard-tour:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ---------- login gate (DC-1) ---------- */
 .authgate { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--desk-grad); }

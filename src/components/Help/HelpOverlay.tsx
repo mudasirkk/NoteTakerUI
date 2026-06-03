@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useStore } from "../../state/store";
 import { useFocusTrap } from "../../keyboard/useFocusTrap";
 import { KEYMAP, GROUP_ORDER, GROUP_NOTES, isBrowserTab, type KeyGroup } from "../../keyboard/keymap";
+import { openTutorial } from "../../platform/tutorial";
 
 // The "?" keyboard-shortcuts overlay (UI-3). Rendered straight from KEYMAP so it
 // can never drift from the real bindings — the footer hint strip reads the same
@@ -72,6 +73,12 @@ export function HelpOverlay() {
         <div className="help-foot">
           <span>
             Press <kbd>?</kbd> any time · <kbd>Esc</kbd> to close
+          </span>
+          <span className="help-foot-tour">
+            New to NoteTaker?{" "}
+            <button className="help-foot-link" onClick={() => void openTutorial()}>
+              Take the quick tour ↗
+            </button>
           </span>
           {isBrowserTab && (
             <span className="help-foot-tip">

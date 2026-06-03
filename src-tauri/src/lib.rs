@@ -1028,6 +1028,19 @@ fn size_window_default(win: &tauri::WebviewWindow) {
     }
 }
 
+// Open an external URL in the user's default browser. The webview cancels
+// window.open / target=_blank to external URLs, so UI "open in browser" actions
+// (e.g. the quick-tour link) route through here. Restricted to http(s) so a stray
+// call can't hand the OS opener an arbitrary scheme; reuses the `open` crate already
+// pulled in for the sign-in flow.
+#[tauri::command]
+fn open_external(url: String) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("refusing to open a non-http(s) url".into());
+    }
+    open::that(url).map_err(|e| format!("couldn't open browser: {e}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
@@ -1048,7 +1061,8 @@ pub fn run() {
             load_legacy_map,
             delete_legacy_map,
             export_text_file,
-            desktop_google_sign_in
+            desktop_google_sign_in,
+            open_external
         ]);
 
     // Global show/hide hotkey (Ctrl+Alt+N) — desktop only.
