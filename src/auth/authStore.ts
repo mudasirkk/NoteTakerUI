@@ -120,6 +120,12 @@ function explainAuthError(e: unknown): string {
     return "The sign-in window closed before finishing. Click Sign in to try again.";
   if (code.includes("operation-not-allowed"))
     return "Google sign-in isn't enabled for this Firebase project. Firebase Console → Authentication → Sign-in method → enable Google.";
+  if (code.includes("unauthorized-domain"))
+    return (
+      "This site's domain isn't authorized for Google sign-in. Add it (e.g. " +
+      (typeof location !== "undefined" ? location.hostname : "your domain") +
+      ") in Firebase Console → Authentication → Settings → Authorized domains, then try again."
+    );
   if (code.includes("invalid-credential") || /audience|\baud\b|INVALID_IDP_RESPONSE/i.test(msg))
     return (
       "Firebase rejected the Google token. The 'Desktop app' OAuth client must be in the SAME " +
